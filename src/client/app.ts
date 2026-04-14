@@ -1,25 +1,39 @@
 import { HOME_BODY, LOGO, STYLES } from "./assets";
 import { get_header } from "./header";
-import { define_homenav, HomeNav } from "./home";
+import { Feed, HomeNav } from "./home";
 
+
+
+enum Tags {
+    Any,
+    Hentai
+}
 
 export interface User {
     name: string;
     token: string;
+    tagpool: Tags[];
 }
+
+
+let RecentPosts: string = "";
+
 // 0. Интерфейсы для типизации
 interface AppState {
-    page: 'home' | 'projects' | 'settings';
+    page: 'home' | 'projects' | 'settings' | 'login';
+    lastpage: 'home' | 'projects' | 'settings' | 'login';
     user?: User;
     items: string[];
 }
 
-define_homenav();
+customElements.define('app-feed', Feed);
+customElements.define('home-nav', HomeNav);
 
 const App = {
     // 1. Состояние приложения с явным типом
     state: {
         page: 'home',
+        lastpage: 'home',
         items: ['Разработка на Rust', 'Настройка Arch Linux', 'Docker контейнеры']
     } as AppState,
 
@@ -41,8 +55,10 @@ const App = {
         let content: string = '';
 
         if (this.state.page === 'home') {
+
             content = `
             ${get_header("home", this.state.user)}
+            <app-feed />
             ${HOME_BODY}
             `;
         } else if (this.state.page === 'projects') {
@@ -63,6 +79,10 @@ const App = {
             <button class="btn-back" data-link="home">← Назад</button>
             </div>
             `;
+        } else if (this.state.pahe === 'login') {
+            content = `
+            <a>fuck u</a>
+            `
         }
 
         root.innerHTML = content;
@@ -80,6 +100,7 @@ const App = {
                 const targetPage = link.getAttribute('data-link') as AppState['page'];
 
                 if (targetPage) {
+                    this.state.lastpage = this.state.page;
                     this.state.page = targetPage;
                     // Исправляем типизацию History API
                     history.pushState({ page: targetPage }, "", `/${targetPage}`);
@@ -89,8 +110,13 @@ const App = {
         });
 
         window.addEventListener('popstate', (e: PopStateEvent) => {
-            if (e.state && (e.state as AppState).page) {
-                this.state.page = (e.state as AppState).page;
+            // e.state — это тот объект { page: targetPage }, который мы пушили
+            if (e.state && e.state.page) {
+                this.state.page = e.state.page;
+                this.render();
+            } else {
+                // Если стейта нет (например, вернулись в самый низ истории), ставим home
+                this.state.page = 'home';
                 this.render();
             }
         });

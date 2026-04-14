@@ -50,6 +50,9 @@ cp ./client/* ./tmp/tempapp/
 replace_label ./tmp/tempapp/assets.ts "##LOGO##" $(img_to_base64 ./client/logo.png)
 replace_label ./tmp/tempapp/assets.ts "##STYLE##" "$(cat ./client/style.css | tr -d '\n' | sed 's/  */ /g')"
 replace_label ./tmp/tempapp/assets.ts "##HOME_BODY##" "$(cat ./client/home-body.html | tr -d '\n' | sed 's/  */ /g')"
+replace_label ./tmp/tempapp/assets.ts "##LIKESVG##" $(img_to_base64 ./client/like.svg)
+replace_label ./tmp/tempapp/assets.ts "##COMMENTSVG##" $(img_to_base64 ./client/comment.svg)
+replace_label ./tmp/tempapp/assets.ts "##LOGINSVG##" $(img_to_base64 ./client/login.svg)
 
 esbuild ./tmp/tempapp/app.ts \
   --bundle \
