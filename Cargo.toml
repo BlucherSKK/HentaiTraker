@@ -1,0 +1,8 @@
+[package]
+name = "HentaiTraker"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rocket = "0.5.1"
+tokio = "1.51.1"

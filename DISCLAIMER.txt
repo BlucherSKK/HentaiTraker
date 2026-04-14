@@ -1,0 +1,20 @@
+1. Nature of the Project
+HentaiTracker (hereinafter "the Software") is an open-source technical framework designed for media streaming, data indexing, and personal library management. This repository contains only source code.
+
+2. Content Responsibility
+The developers of the Software do not provide, host, distribute, or promote any media content, including but not limited to images, videos, or animations. The Software is a neutral tool. All content accessed, stored, or streamed through the Software is the sole responsibility of the end-user.
+
+3. Terminology and Branding
+The use of the word "Hentai" in the project name, source code, logo, and documentation is strictly a technical branding identifier.
+a) It does not constitute the distribution of sexually explicit material.
+b) Within the codebase, this term serves as a metadata tag or a category identifier for indexing systems managed by the user.
+c) The presence of this term does not imply that the Software includes or facilitates access to illegal materials.
+
+4. Legal Compliance
+Users are strictly required to comply with their local, national, and international laws. This includes, but is not limited to, copyright laws and age-restriction regulations. The developers do not condone or support the use of this Software for any illegal activities.
+
+5. Age Restrictions
+The Software is intended for use by adults (18+ or the age of majority in the user's jurisdiction). It is the user's responsibility to implement and maintain appropriate access controls to prevent minors from accessing restricted content.
+
+6. No Warranty
+As specified in the BSD License, this Software is provided "as is" without any warranties. The developers shall not be liable for any claims, damages, or legal consequences arising from the use or misuse of the Software by third parties.

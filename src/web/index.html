@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой Сайт</title>
+    <style>
+        /* Цветовая палитра и ресурсы */
+        :root {
+            --bg-main: #f4f7f6;
+            --bg-card: #ffffff;
+            --bg-nav: lightslategray;
+            --bg-nav-hover: lightpink;
+            --text-main: #333333;
+            --text-header: #2c3e50;
+            --text-secondary: #666666;
+            --accent-color: #3498db;
+            --border-color: #eeeeee;
+            --shadow-color: rgba(0, 0, 0, 0.05);
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+        }
+
+        /* Логотип */
+        header {
+            text-align: center;
+            padding: 30px 20px;
+            background-color: var(--bg-card);
+        }
+
+        .logo-img {
+            height: 100px; /* Регулируй высоту логотипа здесь */
+            width: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .pixelated {
+            /* Для Safari и старых версий iOS */
+            image-rendering: -webkit-optimize-contrast;
+
+            /* Для Firefox */
+            image-rendering: crisp-edges;
+
+            /* Стандартное свойство (работает в Chrome, Edge, Opera) */
+            /* Оно заставляет браузер использовать метод "ближайшего соседа" при масштабировании */
+            image-rendering: pixelated;
+
+            /* Убираем сглаживание, если оно применяется */
+            -ms-interpolation-mode: nearest-neighbor; /* Для старых IE */
+        }
+
+        /* Навигация */
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            background-color: var(--bg-nav);
+            padding: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: 0.3s;
+            font-size: 14px;
+        }
+
+        nav a:hover {
+            background-color: var(--bg-nav-hover);
+        }
+
+        /* Контейнер и карточки */
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px var(--shadow-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 1px solid var(--border-color);
+        }
+
+        .card:hover {
+            transform: scale(1.01);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+
+        .card-content h3 {
+            margin: 0 0 5px 0;
+            color: var(--text-header);
+        }
+
+        .card-content p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .arrow {
+            font-size: 20px;
+            color: var(--accent-color);
+        }
+
+        @media (max-width: 600px) {
+            .card { text-align: center; flex-direction: column; }
+            .arrow { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="/">
+            <img class="logo-img pixelated" src="data:image png;base64,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" alt="Логотип">
+        </a>
+    </header>
+
+    <nav>
+        <a href="#">FAQ</a>
+        <a href="#">Поддержка</a>
+        <a href="#">Контакты</a>
+    </nav>
+
+    <div class="container">
+        <div class="card" onclick="window.location.href='./torrents';">
+            <div class="card-content">
+                <h3>Torrents</h3>
+                <p>Торенты.</p>
+            </div>
+            <div class="arrow">→</div>
+        </div>
+
+        <div class="card" onclick="window.location.href='./forums';">
+            <div class="card-content">
+                <h3>Правила работы</h3>
+                <p>Ознакомьтесь с регламентом перед началом использования.</p>
+            </div>
+            <div class="arrow">→</div>
+        </div>
+    </div>
+
+</body>
+</html>

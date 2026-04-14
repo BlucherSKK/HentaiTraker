@@ -1,0 +1,99 @@
+:root {
+    --bgc: #bfbfbf;
+    --textc: #111111;
+    --ltextc: #7d7d7d;
+    --accentc: #007bff;
+    --border: #FF9CE9;
+    --bg-nav: lightslategray;
+    --bg-nav-hover: lightpink;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bgc: #111111;
+        --textc: #eeeeee;
+        --ltextc: #bfbfbf;
+        --accentc: #375a7f;
+        --border: #D10092;
+        --bg-nav: gray;
+        --bg-nav-hover: pink;
+    }
+}
+
+.header {
+    background: linear-gradient(black, darkolivegreen);
+    border-bottom: 10px darkorchid ridge;
+    display: flex;
+    flex-direction: row;
+
+    /* Добавляем эти свойства: */
+    justify-content: space-between; /* Логотип слева, кнопки справа */
+    align-items: center;            /* Центрирование по вертикали */
+    padding: 0 20px;               /* Отступы по бокам, чтобы не прилипало к краям */
+}
+
+/* Стили для контейнера с кнопками/пользователем */
+.header-actions {
+    display: flex;
+    /* Выравниваем элементы внутри блока по горизонтали */
+    align-items: center;
+    /* Прижимаем весь блок вниз контейнера .header */
+    align-self: flex-end;
+    /* Отступ снизу 5% от высоты хедера */
+    margin-bottom: 5%;
+}
+
+/* Чтобы кнопки входа/регистрации или данные профиля стояли в ряд */
+.auth-buttons, .user-container {
+    gap: 15px;      /* Расстояние между кнопками */
+    ma
+}
+
+.logo-img {
+    height: 100px;
+    width: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+nav {
+    display: flex;
+    /* Выстраиваем дочерние элементы вертикально (друг под другом) */
+    flex-direction: column;
+
+    /* Центрируем элементы по горизонтали */
+    align-items: center;
+
+    /* Прижимаем элементы к верху по вертикали */5
+    justify-content: flex-start;
+
+    /* Дополнительные стили для наглядности */
+    min-height: 40%;
+    padding: 20px;
+    gap: 15px; /* Отступ между внутренними контейнерами */
+}
+nav div {
+    color: white;
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    transition: 0.3s;
+    font-size: 14px;
+}
+nav div:hover {
+    background-color: var(--bg-nav-hover);
+}
+.pixelated {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+    margin-right: 60%;
+    margin-left: 1%;
+}
+
+.container { padding: 40px; max-width: 800px; margin: 0 auto; }
+h1 { color: var(--textc); border-bottom: 2px solid var(--bgc); padding-bottom: 10px; }
+.menu { list-style: none; padding: 0; display: flex; gap: 20px; }
+.menu a { color: var(--textc); text-decoration: none; font-weight: bold; }
+.btn-back { margin-top: 20px; padding: 10px 20px; background: var(--bgc); color: var(--textc); border: none; cursor: pointer; border-radius: 5px; }
+li { margin: 10px 0; font-size: 1.1em; }
