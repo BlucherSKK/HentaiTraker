@@ -1,4 +1,4 @@
-import { LOGO } from "./assets";
+import { LOGO, SVG_LOGIN } from "./assets";
 import { User } from "./app";
 
 
@@ -17,13 +17,13 @@ export function get_header(page: string, user?: User): string {
         </div>
         `
         : `
-        <div class="auth-buttons">
-        <a href="/login">Вход</a>
-        <a href="/register">Регистрация</a>
-        </div>
+        <a class="auth-btn" data-link="login">
+            <img src="${SVG_LOGIN}"/>
+        </a>
         `
     }
     </div>
     </header>
     `;
 }
+
