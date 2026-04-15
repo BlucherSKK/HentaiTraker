@@ -4,5 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-rocket = "0.5.1"
+argon2 = { version = "0.5.3", features = ["password-hash"] }
+chrono = { version = "0.4.44", features = ["serde"] }
+password-hash = "0.6.1"
+rocket = { version = "0.5.1", features = ["json"] }
+serde = "1.0.228"
+serde_json = "1.0.149"
+sqlx = { version = "0.8.6", features = ["chrono", "postgres", "runtime-tokio"] }
 tokio = "1.51.1"

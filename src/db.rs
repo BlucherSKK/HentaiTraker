@@ -114,6 +114,29 @@ impl Database {
         .await
     }
 
+    pub async fn get_latest_post_before(&self, time: NaiveDateTime) -> Result<Option<Post>, sqlx::Error> {
+        sqlx::query_as::<_, Post>(
+            "SELECT * FROM posts
+            WHERE time < $1
+            ORDER BY time DESC
+            LIMIT 1",
+        )
+        .bind(time)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    pub async fn get_latest_post_before_now(&self) -> Result<Option<Post>, sqlx::Error> {
+        sqlx::query_as::<_, Post>(
+            "SELECT * FROM posts
+            WHERE time < NOW()
+            ORDER BY time DESC
+            LIMIT 1",
+        )
+        .fetch_optional(&self.pool)
+        .await
+    }
+
     pub async fn insert_post(&self, author_id: i32, title: Option<&str>, content: &str) -> Result<Post, sqlx::Error> {
         sqlx::query_as::<_, Post>(
             "INSERT INTO posts (title, content, author_id, time)
