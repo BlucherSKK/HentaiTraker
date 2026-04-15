@@ -1,0 +1,173 @@
+use sqlx::postgres::{PgPool, PgPoolOptions};
+use std::time::Duration;
+use sqlx::FromRow;
+use chrono::NaiveDateTime;
+
+#[derive(Debug, FromRow)]
+pub struct User {
+    pub id: i32,
+    pub name: String,
+    pub pass: String,
+    pub last_visit: NaiveDateTime,
+    pub roles: Option<String>,
+    pub avatar: Option<String>,
+    pub tags: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+pub struct Post {
+    pub id: i32,
+    pub title: Option<String>,
+    pub content: String,
+    pub files: Option<String>,
+    pub author_id: i32,
+    pub time: NaiveDateTime,
+    pub tags: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+pub struct Chat {
+    pub id: i32,
+    pub title: Option<String>,
+    pub content: String,
+    pub images: Option<String>,
+    pub author_id: i32,
+    pub time: NaiveDateTime,
+}
+
+#[derive(Debug, FromRow)]
+pub struct Message {
+    pub id: i32,
+    pub content: String,
+    pub files: Option<String>,
+    pub author_id: i32,
+    pub chat_id: i32,
+    pub time: NaiveDateTime,
+}
+
+#[derive(Clone)]
+pub struct Database {
+    pool: PgPool,
+}
+
+impl Database {
+    pub async fn init(database_url: &str) -> Result<Self, sqlx::Error> {
+        let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .acquire_timeout(Duration::from_secs(3))
+        .connect(database_url)
+        .await?;
+
+        let db = Self { pool };
+
+        sqlx::query(include_str!("./db.sql"))
+        .execute(&db.pool)
+        .await?;
+
+        db.setup_schema().await?;
+
+        Ok(db)
+    }
+
+    async fn setup_schema(&self) -> Result<(), sqlx::Error> {
+        sqlx::query("SELECT init_db_schema();")
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn create_user(&self, username: &str) -> Result<(), sqlx::Error> {
+        sqlx::query("INSERT INTO users (username) VALUES ($1)")
+        .bind(username)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    // --- USERS ---
+    pub async fn get_user_by_id(&self, id: i32) -> Result<Option<User>, sqlx::Error> {
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    pub async fn insert_user(&self, name: &str, pass: &str, roles: &str) -> Result<User, sqlx::Error> {
+        sqlx::query_as::<_, User>(
+            "INSERT INTO users (name, pass, last_visit, roles)
+        VALUES ($1, $2, NOW(), $3) RETURNING *"
+        )
+        .bind(name)
+        .bind(pass)
+        .bind(roles)
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    // --- POSTS ---
+    pub async fn get_posts_by_author(&self, author_id: i32) -> Result<Vec<Post>, sqlx::Error> {
+        sqlx::query_as::<_, Post>("SELECT * FROM posts WHERE author_id = $1 ORDER BY time DESC")
+        .bind(author_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn insert_post(&self, author_id: i32, title: Option<&str>, content: &str) -> Result<Post, sqlx::Error> {
+        sqlx::query_as::<_, Post>(
+            "INSERT INTO posts (title, content, author_id, time)
+        VALUES ($1, $2, $3, NOW()) RETURNING *"
+        )
+        .bind(title)
+        .bind(content)
+        .bind(author_id)
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    // --- CHATS ---
+    pub async fn create_chat(&self, author_id: i32, title: Option<&str>, content: &str) -> Result<Chat, sqlx::Error> {
+        sqlx::query_as::<_, Chat>(
+            "INSERT INTO chats (title, content, author_id, time)
+        VALUES ($1, $2, $3, NOW()) RETURNING *"
+        )
+        .bind(title)
+        .bind(content)
+        .bind(author_id)
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    pub async fn add_chat_member(&self, chat_id: i32, member_id: i32) -> Result<(), sqlx::Error> {
+        sqlx::query("INSERT INTO cross_chat_members (chat_id, member_id) VALUES ($1, $2)")
+        .bind(chat_id)
+        .bind(member_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    // --- MESSAGES ---
+    pub async fn send_message(&self, chat_id: i32, author_id: i32, content: &str) -> Result<Message, sqlx::Error> {
+        sqlx::query_as::<_, Message>(
+            "INSERT INTO msg (content, author_id, chat_id, time)
+        VALUES ($1, $2, $3, NOW()) RETURNING *"
+        )
+        .bind(content)
+        .bind(author_id)
+        .bind(chat_id)
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    pub async fn get_chat_messages(&self, chat_id: i32, limit: i64) -> Result<Vec<Message>, sqlx::Error> {
+        sqlx::query_as::<_, Message>(
+            "SELECT * FROM msg WHERE chat_id = $1 ORDER BY time DESC LIMIT $2"
+        )
+        .bind(chat_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+}

@@ -11,6 +11,8 @@ use rocket::get;
 use rocket::serde::{Serialize, Deserialize, json::Json}; // Добавили Json сюда
 use std::sync::RwLock; // Используем RwLock вместо Mutex для скорости (много читателей, один писатель)
 use rocket::State;
+mod db;
+mod secure;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Post {
