@@ -88,7 +88,6 @@
     height: 100px;
     width: auto;
     display: block;
-    margin: 0 auto;
 }
 
 nav {
@@ -121,10 +120,10 @@ nav div {
     border-radius: 2em;
     padding: 1em;
     margin: 1em;
-    height: 11em;
-    display: flex;       /* Включаем Flexbox */
+    display: flex;
     flex-direction: row;
-    gap: 1em
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 .post-card:hover {
@@ -132,9 +131,16 @@ nav div {
     border: pink solid;
 }
 
+.post-img {
+    max-width: 25%;
+    object-fit: contain;
+    margin-bottom: 0.5em;
+}
+
 .post-text {
+    flex: 1;
+    min-height: 3em;
     overflow: hidden;
-    width: 80%;
 }
 
 .post-text-body {
@@ -147,11 +153,6 @@ nav div {
     /* Дополнительно: убедитесь, что line-height настроен для красоты */
     line-height: 1.5;
     max-height: 3em;                /* Высота = line-height * количество строк */
-}
-
-.post-img {
-    height: 10em;
-    width: 10em;
 }
 
 .post-info {
@@ -175,8 +176,6 @@ nav div:hover {
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
     image-rendering: pixelated;
-    margin-right: 60%;
-    margin-left: 1%;
 }
 
 .container { padding: 40px; max-width: 800px; margin: 0 auto; }
