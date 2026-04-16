@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "argon2",
  "chrono",
+ "dotenvy",
  "password-hash 0.6.1",
  "rocket",
  "serde",

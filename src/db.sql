@@ -1,3 +1,4 @@
+-- Убрана лишняя запятая после tags
 CREATE OR REPLACE FUNCTION init_user_table()
 RETURNS void AS $$
 BEGIN
@@ -8,11 +9,12 @@ BEGIN
         last_visit TIMESTAMP NOT NULL,
         roles TEXT,
         avatar TEXT,
-        tags TEXT,
+        tags TEXT
     );
 END;
 $$ LANGUAGE plpgsql;
 
+-- Убрана лишняя запятая после tags
 CREATE OR REPLACE FUNCTION init_posts_table()
 RETURNS void AS $$
 BEGIN
@@ -23,11 +25,12 @@ BEGIN
         files TEXT,
         author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         time TIMESTAMP NOT NULL,
-        tags TEXT,
+        tags TEXT
     );
 END;
 $$ LANGUAGE plpgsql;
 
+-- Убрана лишняя запятая после time
 CREATE OR REPLACE FUNCTION init_chats_table()
 RETURNS void AS $$
 BEGIN
@@ -37,22 +40,24 @@ BEGIN
         content TEXT NOT NULL,
         images TEXT,
         author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        time TIMESTAMP NOT NULL,
+        time TIMESTAMP NOT NULL
     );
 END;
 $$ LANGUAGE plpgsql;
 
+-- Исправлены внешние ключи: member_id -> users, chat_id -> chats
 CREATE OR REPLACE FUNCTION init_cross_cher_members_table()
 RETURNS void AS $$
 BEGIN
     CREATE TABLE IF NOT EXISTS cross_chat_members (
-        member_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
-        chat_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+        member_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        chat_id INTEGER REFERENCES chats(id) ON DELETE CASCADE,
         PRIMARY KEY (member_id, chat_id)
     );
 END;
 $$ LANGUAGE plpgsql;
 
+-- Убрана лишняя запятая после time
 CREATE OR REPLACE FUNCTION init_msg_table()
 RETURNS void AS $$
 BEGIN
@@ -62,11 +67,10 @@ BEGIN
         files TEXT,
         author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         chat_id INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
-        time TIMESTAMP NOT NULL,
+        time TIMESTAMP NOT NULL
     );
 END;
 $$ LANGUAGE plpgsql;
-
 
 CREATE OR REPLACE FUNCTION init_db_schema()
 RETURNS void AS $$

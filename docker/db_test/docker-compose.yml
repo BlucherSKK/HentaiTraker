@@ -1,0 +1,13 @@
+
+services:
+  db:
+    image: postgres:latest
+    container_name: test-postgres
+    restart: always
+    shm_size: 128mb
+    environment:
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_USER: user
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"

@@ -6,7 +6,8 @@ import { User } from "./app";
 export function get_header(page: string, user?: User): string {
     return `
     <header class="header">
-    <img class="logo-img pixelated" src="${LOGO}" alt="Logo"/>
+    <div class="right-pane">
+        <img class="logo-img pixelated" src="${LOGO}" alt="Logo"/>
 
     <div class="header-actions">
     ${user

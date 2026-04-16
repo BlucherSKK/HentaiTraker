@@ -13,15 +13,7 @@ use std::sync::RwLock; // Используем RwLock вместо Mutex для 
 use rocket::State;
 mod db;
 mod secure;
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct Post {
-    pub title: String,
-    pub text: String,
-    pub image_base64: Option<String>, // Картинка может быть, а может и нет
-    pub comment_count: u64,
-    pub like_count: u64,
-}
+mod handle;
 
 pub struct AppState {
     // Храним уже готовую JSON строку
@@ -79,7 +71,7 @@ fn app() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
         while offset < total {
             let end = std::cmp::min(offset + chunk_size, total);
             let chunk = app_content[offset..end].to_vec();
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(100000)).await;
             yield Cursor::new(chunk);
             offset = end;
         }
@@ -112,12 +104,15 @@ fn appmap() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
 }
 
 
+use crate::db::Post;
+
 #[rocket::main]
 async fn main() {
     // 1. Создаем начальные данные (динамический массив)
     // Убедись, что структура Post объявлена выше или импортирована
     let initial_posts: Vec<Post> = vec![
         Post {
+            id: 1,
             title: String::from("Первый пост"),
             text: String::from("Описание первого поста"),
             image_base64: None,
@@ -125,6 +120,7 @@ async fn main() {
             like_count: 15,
         },
         Post {
+            id: 2,
             title: String::from("Второй пост"),
             text: String::from("Тут есть картинкаdwqdqqdgdywe erw fhgwhrefg fwreg fhrwgfuhye rgfuyergfu  geriugfegfrui gerergeriugerkuuo uruerw ewru ewruhu hewugiherwuigheruwhkuewrheuri o gorehguioerhguehr  rguoe huoigferhuiohguer go guio herouhogu"),
             image_base64: Some(String::from("data:image/png;base64,iVBORw0KG... ")),
