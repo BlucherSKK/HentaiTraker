@@ -1,5 +1,5 @@
 import { HOME_BODY, LOGO, STYLES } from "./assets";
-import { get_header } from "./header";
+import { get_header, get_nonlogin_dm_noty } from "./header";
 import { Feed, HomeNav } from "./home";
 import { AppNav } from "./nav";
 
@@ -63,8 +63,8 @@ const App = {
 
             content = `
                 ${get_header("home", this.state.user)}
-                <app-nav data-link="${this.state.page}"></app-nav>
                 <hero id="apphero">
+                    <app-nav data-link="${this.state.page}" />
                     <app-feed />
                 </hero>
                 `
@@ -81,11 +81,18 @@ const App = {
             switch (this.state.page) {
                 case 'feeds':
                     content = `
+                    <app-nav data-link="${this.state.page}"></app-nav>
                     <app-feed />
                     `
                     break;
+                case 'dm':
+                    content = `
+                    <app-nav data-link="${this.state.page}"></app-nav>
+                    ${this.state.user ? "" : get_nonlogin_dm_noty()}
+                    `
+                    break;
                 default:
-                    content = ""
+                    content = `<app-nav data-link="${this.state.page}"></app-nav>`
                     break;
             }
             root.innerHTML = content;
@@ -109,7 +116,7 @@ const App = {
                     this.state.lastpage = this.state.page;
                     this.state.page = targetPage;
                     // Исправляем типизацию History API
-                    history.pushState({ page: targetPage }, "", `/${targetPage}`);
+                    history.pushState({ page: targetPage }, "", `/#${targetPage}`);
                     this.render();
                 }
             }

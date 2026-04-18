@@ -31,21 +31,20 @@
     flex-direction: row;   /* Направление — в ряд */
     gap: 15px;            /* Расстояние между кнопками */
     justify-content: left; /* Центрируем кнопки по горизонтали */
-    padding: 20px;
-    background-color: #f4f4f4;
+    padding-left: 1%;
     border-radius: 8px;
 }
 
 /* Стилизация кнопок */
 .nav-btn {
-    padding: 10px 20px;
+    padding: 0 20px;
     font-size: 16px;
     cursor: pointer;
-    border: none;
-    border-radius: 5px;
-    background-color: #007bff;
+    border: 5px lightgray inset;
+    background-color: var(--bg-nav);
     color: white;
     transition: background-color 0.3s;
+    border-top: none;
 }
 
 .nav-btn:hover {
@@ -53,7 +52,14 @@
 }
 
 .nav-btn-here {
-    background-color: #28a745;
+    padding: 0 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border: 5px lightgoldenrodyellow inset;
+    border-top: none;
+    background-color: darkolivegreen;
+    color: white;
+    transition: background-color 0.3s;
 }
 
 
@@ -62,6 +68,25 @@
     width: 10%;
     margin: 0 45%;
 
+}
+
+.hero-noty {
+    display: flex;
+    flex-direction: column;
+    border: 5px white solid;
+    border-radius: 1em;
+    justify-content: center;
+    width: 20%;
+    align-items: center;
+    padding: 2em;
+}
+
+.center-hero-noty {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    height: 20em;
+    align-items: center;
 }
 
 .feed {
