@@ -14,6 +14,7 @@ use rocket::State;
 mod db;
 mod secure;
 mod handle;
+mod hnts;
 
 pub struct AppState {
     // Храним уже готовую JSON строку
@@ -64,6 +65,7 @@ fn app() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
     let app_content = include_str!("./web/app.min.js").as_bytes().to_vec();
     let total_len = app_content.len() as u64;
     let chunk_size = 1024;
+    let delay = if cfg!(feature = "QA") {1000} else {0};
 
     let stream = ReaderStream! {
         let mut offset = 0;
@@ -71,7 +73,7 @@ fn app() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
         while offset < total {
             let end = std::cmp::min(offset + chunk_size, total);
             let chunk = app_content[offset..end].to_vec();
-            tokio::time::sleep(tokio::time::Duration::from_millis(100000)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
             yield Cursor::new(chunk);
             offset = end;
         }
@@ -105,28 +107,14 @@ fn appmap() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
 
 
 use crate::db::Post;
+use crate::handle::Tags;
 
 #[rocket::main]
 async fn main() {
     // 1. Создаем начальные данные (динамический массив)
     // Убедись, что структура Post объявлена выше или импортирована
     let initial_posts: Vec<Post> = vec![
-        Post {
-            id: 1,
-            title: String::from("Первый пост"),
-            text: String::from("Описание первого поста"),
-            image_base64: None,
-            comment_count: 10,
-            like_count: 15,
-        },
-        Post {
-            id: 2,
-            title: String::from("Второй пост"),
-            text: String::from("Тут есть картинкаdwqdqqdgdywe erw fhgwhrefg fwreg fhrwgfuhye rgfuyergfu  geriugfegfrui gerergeriugerkuuo uruerw ewru ewruhu hewugiherwuigheruwhkuewrheuri o gorehguioerhguehr  rguoe huoigferhuiohguer go guio herouhogu"),
-            image_base64: Some(String::from("data:image/png;base64,iVBORw0KG... ")),
-            comment_count: 1,
-            like_count: 10,
-        },
+        Post::new(1, Some("x".to_string()), "we".to_string(), vec![Tags::Hentai])
     ];
 
     // 2. Сериализуем массив в JSON-строку заранее

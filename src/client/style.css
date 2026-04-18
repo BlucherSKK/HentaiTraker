@@ -26,6 +26,37 @@
     }
 }
 
+.nav-container {
+    display: flex;         /* Включаем Flexbox */
+    flex-direction: row;   /* Направление — в ряд */
+    gap: 15px;            /* Расстояние между кнопками */
+    justify-content: left; /* Центрируем кнопки по горизонтали */
+    padding: 20px;
+    background-color: #f4f4f4;
+    border-radius: 8px;
+}
+
+/* Стилизация кнопок */
+.nav-btn {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background-color: #007bff;
+    color: white;
+    transition: background-color 0.3s;
+}
+
+.nav-btn:hover {
+    background-color: #0056b3;
+}
+
+.nav-btn-here {
+    background-color: #28a745;
+}
+
+
 .loader {
     height: 10%;
     width: 10%;

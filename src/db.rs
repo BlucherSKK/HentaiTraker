@@ -2,8 +2,9 @@ use chrono::NaiveDateTime;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::{Executor, FromRow};
 use std::time::Duration;
+use serde::Serialize;
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, Serialize)]
 pub struct User {
     pub id: i32,
     pub name: String,
@@ -14,7 +15,7 @@ pub struct User {
     pub tags: Option<String>,
 }
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, Serialize)]
 pub struct Post {
     pub id: i32,
     pub title: Option<String>,
@@ -25,7 +26,7 @@ pub struct Post {
     pub tags: Option<String>,
 }
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, Serialize)]
 pub struct Chat {
     pub id: i32,
     pub title: Option<String>,
@@ -35,7 +36,7 @@ pub struct Chat {
     pub time: NaiveDateTime,
 }
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, Serialize)]
 pub struct Message {
     pub id: i32,
     pub content: String,

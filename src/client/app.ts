@@ -1,6 +1,7 @@
 import { HOME_BODY, LOGO, STYLES } from "./assets";
 import { get_header } from "./header";
 import { Feed, HomeNav } from "./home";
+import { AppNav } from "./nav";
 
 
 
@@ -20,21 +21,24 @@ let RecentPosts: string = "";
 
 // 0. Интерфейсы для типизации
 interface AppState {
-    page: 'home' | 'projects' | 'settings' | 'login';
-    lastpage: 'home' | 'projects' | 'settings' | 'login';
+    page: 'feeds' | 'projects' | 'settings' | 'login' | 'dm' | "chats";
+    lastpage: 'feeds' | 'projects' | 'settings' | 'login' | 'dm' | 'chats';
     user?: User;
     items: string[];
+    init: boolean;
 }
 
 customElements.define('app-feed', Feed);
 customElements.define('home-nav', HomeNav);
+customElements.define('app-nav', AppNav);
 
 const App = {
     // 1. Состояние приложения с явным типом
     state: {
-        page: 'home',
-        lastpage: 'home',
-        items: ['Разработка на Rust', 'Настройка Arch Linux', 'Docker контейнеры']
+        page: 'feeds',
+        lastpage: 'feeds',
+        items: ['Разработка на Rust', 'Настройка Arch Linux', 'Docker контейнеры'],
+        init: false,
     } as AppState,
 
     // 2. Инициализация
@@ -46,46 +50,48 @@ const App = {
 
     // 3. Главный движок отрисовки
     render(): void {
-        const root = document.getElementById('app');
-        if (!root) {
-            console.error("Элемент #app не найден");
-            return;
+        if (this.state.init === false) {
+            this.state.page = 'feeds';
+            this.state.init = true;
+            const root = document.getElementById('app');
+            if (!root) {
+                console.error("Элемент #app не найден");
+                return;
+            }
+
+            let content: string = '';
+
+            content = `
+                ${get_header("home", this.state.user)}
+                <app-nav data-link="${this.state.page}"></app-nav>
+                <hero id="apphero">
+                    <app-feed />
+                </hero>
+                `
+            root.innerHTML = content;
+        } else {
+            const root = document.getElementById('apphero');
+            if (!root) {
+                console.error("Элемент #apphero не найден");
+                return;
+            }
+
+            let content: string = '';
+
+            switch (this.state.page) {
+                case 'feeds':
+                    content = `
+                    <app-feed />
+                    `
+                    break;
+                default:
+                    content = ""
+                    break;
+            }
+            root.innerHTML = content;
+
         }
 
-        let content: string = '';
-
-        if (this.state.page === 'home') {
-
-            content = `
-            ${get_header("home", this.state.user)}
-            <app-feed />
-            ${HOME_BODY}
-            `;
-        } else if (this.state.page === 'projects') {
-            content = `
-            <div class="container">
-            <h1>Мои проекты</h1>
-            <ul>
-            ${this.state.items.map(item => `<li>${item}</li>`).join('')}
-            </ul>
-            <button class="btn-back" data-link="home">← Назад</button>
-            </div>
-            `;
-        } else if (this.state.page === 'settings') {
-            content = `
-            <div class="container">
-            <h1>Настройки сервера</h1>
-            <p>Здесь будут параметры конфигурации...</p>
-            <button class="btn-back" data-link="home">← Назад</button>
-            </div>
-            `;
-        } else if (this.state.pahe === 'login') {
-            content = `
-            <a>fuck u</a>
-            `
-        }
-
-        root.innerHTML = content;
         this.applyStyles();
     },
 
@@ -116,7 +122,7 @@ const App = {
                 this.render();
             } else {
                 // Если стейта нет (например, вернулись в самый низ истории), ставим home
-                this.state.page = 'home';
+                this.state.page = 'feeds';
                 this.render();
             }
         });

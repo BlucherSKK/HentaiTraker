@@ -50,6 +50,6 @@ impl Post {
         Some(format!("{}{}", SERIALIZE_TAGS_RESOLUTION, serialized).to_string())
     }
 
-    fn serialize_attachments()
+    //fn serialize_attachments()
 
 }
