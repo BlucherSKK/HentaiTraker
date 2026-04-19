@@ -26,6 +26,7 @@ export function get_header(page: string, user?: User): string {
     </div>
     </header>
     `;
+
 }
 
 export function get_nonlogin_dm_noty(): string {

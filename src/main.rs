@@ -65,7 +65,7 @@ fn app() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
     let app_content = include_str!("./web/app.min.js").as_bytes().to_vec();
     let total_len = app_content.len() as u64;
     let chunk_size = 1024;
-    let delay = if cfg!(feature = "QA") {1000} else {0};
+    let delay = if cfg!(feature = "QA") {100000} else {0};
 
     let stream = ReaderStream! {
         let mut offset = 0;
