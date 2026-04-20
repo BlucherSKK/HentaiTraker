@@ -1,9 +1,14 @@
+use crate::db::User;
+
 
 
 pub enum SessionState {
-
+    LongToken,
+    PPauthToken,
+    PrivateAuthToken
 }
 
 pub struct Session {
-    state:
+    state: SessionState,
+    user: Option<User>,
 }
