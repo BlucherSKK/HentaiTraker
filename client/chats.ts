@@ -1,6 +1,11 @@
+import { HntDataBase } from "./db";
 
 
 export class Chats extends HTMLElement {
+
+
+    public db!: HntDataBase;
+
     static get observedAttributes() {
         return ['data-selected-id'];
     }
@@ -21,7 +26,7 @@ export class Chats extends HTMLElement {
         this.innerHTML = `
         <div class="chat-container">
             <aside class="chat-sidebar">
-                <div class="chat-header">Диалоги</div>
+                <div class="chat-header">Чаты</div>
                     <div style="overflow-y: auto;">
                     ${this.renderChatList()}
                 </div>
@@ -34,7 +39,7 @@ export class Chats extends HTMLElement {
             <aside class="chat-right-panel">
                 <div class="chat-header">Участники</div>
                     <div style="padding: 10px;">
-                    ${selectedChatId ? this.renderParticipants(selectedChatId) : ''}
+                    ${selectedChatId ? this.renderMemberBar(selectedChatId) : ''}
                 </div>
             </aside>
         </div>
@@ -58,35 +63,37 @@ export class Chats extends HTMLElement {
     }
 
     private renderChatList(): string {
-        // Заглушка отрисовки списка
-        return `<div class="list-item">Загрузка чатов...</div>`;
+
+        if (!this.db) {
+            return `<div class="list-item">Ошибка инициализации БД</div>`;
+        }
+
+        const chats = this.db.get_chats();
+
+        // 2. Если чатов еще нет или они грузятся
+        if (!chats || chats.length === 0) {
+            return `<div class="list-item">Чатов пока нет...</div>`;
+        }
+
+        // 3. Рендерим список, "топая" от полученных данных
+        return chats.map(chat => `
+        <div class="list-item ${this.getAttribute('data-selected-id') === chat.id ? 'active' : ''}"
+        onclick="this.closest('app-chats').setAttribute('data-selected-id', '${chat.id}')">
+        <img src="${chat.avatar || 'default-avatar.png'}" class="chat-mini-avatar" alt="avatar">
+        <div class="chat-info">
+        <div class="chat-name">${chat.name}</div>
+        <div class="chat-last-msg">Нажмите, чтобы открыть</div>
+        </div>
+        </div>
+        `).join('');
     }
 
-    private renderParticipants(id: string): string {
+    private renderMemberBar(id: string): string {
         // Заглушка отрисовки участников
         return `<div style="font-size: 0.9em; color: #666;">Загрузка списка...</div>`;
     }
 
     // --- ПРОТОТИПЫ ГЕТТЕРОВ (для будущей реализации) ---
 
-    /** Возвращает массив текущих чатов */
-    get chatsList(): any[] {
-        return [];
-    }
-
-    /** Возвращает сообщения активного чата из кэша или стейта */
-    get activeMessages(): any[] {
-        return [];
-    }
-
-    /** Возвращает список участников для выбранного чата */
-    get currentParticipants(): any[] {
-        return [];
-    }
-
-    /** Геттер для получения мета-данных (например, онлайн ли собеседник) */
-    get chatMetadata(): object {
-        return {};
-    }
 }
 

@@ -60,7 +60,7 @@ impl Database {
         .await?;
 
         let db = Self { pool };
-        db.pool.execute(include_str!("./db.sql")).await?;
+        db.pool.execute(include_str!("../db.sql")).await?;
         db.setup_schema().await?;
 
         Ok(db)

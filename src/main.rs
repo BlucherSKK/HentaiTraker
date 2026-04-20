@@ -11,10 +11,10 @@ use rocket::get;
 use rocket::serde::{Serialize, Deserialize, json::Json}; // Добавили Json сюда
 use std::sync::RwLock; // Используем RwLock вместо Mutex для скорости (много читателей, один писатель)
 use rocket::State;
-mod db;
 mod secure;
 mod handle;
 mod hnts;
+mod db;
 
 pub struct AppState {
     // Храним уже готовую JSON строку
@@ -106,11 +106,12 @@ fn appmap() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
 }
 
 
-use crate::db::Post;
-use crate::handle::Tags;
+use crate::db::postgress::Post;
+use crate::db::Tags;
 
 #[rocket::main]
 async fn main() {
+    env_logger::init();
     // 1. Создаем начальные данные (динамический массив)
     // Убедись, что структура Post объявлена выше или импортирована
     let initial_posts: Vec<Post> = vec![

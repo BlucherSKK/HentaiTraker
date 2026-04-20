@@ -1,5 +1,6 @@
 import { STYLES } from "./assets";
 import { Chats } from "./chats";
+import { HntDataBase, init_test_db } from "./db";
 import { get_header, get_nonlogin_dm_noty } from "./header";
 import { Feed, HomeNav } from "./home";
 import { AppNav } from "./nav";
@@ -24,6 +25,7 @@ interface AppState {
     user?: User;
     items: string[];
     init: boolean;
+    db: HntDataBase;
 }
 
 customElements.define('app-feed', Feed);
@@ -37,6 +39,7 @@ const App = {
         lastpage: 'feeds',
         items: ['Разработка на Rust', 'Настройка Arch Linux', 'Docker контейнеры'],
         init: false,
+        db: init_test_db(),
     } as AppState,
 
     init(): void {
@@ -61,6 +64,14 @@ const App = {
         if (!hero) return;
 
         hero.innerHTML = this.getContentByPage();
+
+        if (this.state.page === 'chats') {
+            const chatsElem = root.querySelector('app-chats') as Chats;
+            if (chatsElem) {
+                chatsElem.db = this.state.db; // Передаем объект по ссылке
+                chatsElem.render(); // Вызываем рендер повторно, когда данные на месте
+            }
+        }
     },
 
     getContentByPage(): string {
