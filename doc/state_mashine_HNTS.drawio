@@ -4,92 +4,120 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-5" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontColor=#009900;" target="QVwQwyUG0Fi7LHdL0sS_-6" value="отправка ВТНС&lt;div&gt;быстрее времени рефреша&amp;nbsp;&lt;br&gt;hnts токена&lt;/div&gt;">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="480" y="-580" as="sourcePoint" />
-            <mxPoint x="670" y="-580" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-7" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;curved=1;exitX=0.932;exitY=0.811;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.027;entryY=0.709;entryDx=0;entryDy=0;entryPerimeter=0;fontColor=#990000;" target="QVwQwyUG0Fi7LHdL0sS_-4" value="отправка ВТНС не удалась,&lt;br&gt;или была слишком медленной&amp;nbsp;">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="590" y="-558" />
-              <mxPoint x="590" y="-460" />
-              <mxPoint x="310" y="-460" />
-              <mxPoint x="310" y="-563" />
-            </Array>
-            <mxPoint x="474.55999999999995" y="-558.16" as="sourcePoint" />
-            <mxPoint x="370" y="-560" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-4" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="session&lt;br&gt;entripoint" vertex="1">
-          <mxGeometry height="80" width="80" x="400" y="-620" as="geometry" />
-        </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-10" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontColor=#009900;" target="QVwQwyUG0Fi7LHdL0sS_-8" value="отправка валидных&lt;br&gt;данных аунтентификации">
-          <mxGeometry relative="1" x="0.0385" as="geometry">
-            <mxPoint as="offset" />
-            <mxPoint x="732" y="-580" as="sourcePoint" />
-            <mxPoint x="908" y="-580" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-11" edge="1" parent="1" source="QVwQwyUG0Fi7LHdL0sS_-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.101;entryY=0.812;entryDx=0;entryDy=0;entryPerimeter=0;curved=1;exitX=0.908;exitY=0.805;exitDx=0;exitDy=0;exitPerimeter=0;fontColor=#990000;" target="QVwQwyUG0Fi7LHdL0sS_-6" value="отправка инвалидных&lt;br&gt;данных аунтентификации">
-          <mxGeometry relative="1" x="0.1411" as="geometry">
-            <mxPoint as="offset" />
-            <Array as="points">
-              <mxPoint x="860" y="-556" />
-              <mxPoint x="860" y="-450" />
-              <mxPoint x="650" y="-450" />
-              <mxPoint x="650" y="-555" />
-            </Array>
-            <mxPoint x="760" y="-340" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-6" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="сессия&lt;br&gt;имеет долгий&lt;br&gt;токен" vertex="1">
-          <mxGeometry height="80" width="80" x="680" y="-620" as="geometry" />
-        </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-20" edge="1" parent="1" source="QVwQwyUG0Fi7LHdL0sS_-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.098;entryY=0.774;entryDx=0;entryDy=0;entryPerimeter=0;curved=1;fontColor=#009900;" target="QVwQwyUG0Fi7LHdL0sS_-8" value="успешная отправка\получение,&amp;nbsp;&lt;br&gt;шифровка\дишифровка и&amp;nbsp;&lt;br&gt;получение\отправка подтверждения&lt;br&gt;операции">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="1090" y="-560" />
-              <mxPoint x="1090" y="-430" />
-              <mxPoint x="880" y="-430" />
-              <mxPoint x="880" y="-558" />
-            </Array>
-            <mxPoint x="990" y="-410" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-24" edge="1" parent="1" source="QVwQwyUG0Fi7LHdL0sS_-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontColor=#990000;" target="QVwQwyUG0Fi7LHdL0sS_-23" value="&lt;span style=&quot;font-family: Helvetica; font-size: 11px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; background-color: rgb(255, 255, 255); text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; float: none; display: inline !important;&quot;&gt;ошибка дишефровки или&lt;/span&gt;&lt;br style=&quot;forced-color-adjust: none; font-family: Helvetica; font-size: 11px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;&quot;&gt;&lt;span style=&quot;font-family: Helvetica; font-size: 11px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; background-color: rgb(255, 255, 255); text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; float: none; display: inline !important;&quot;&gt;получение ответа с ошибкой&amp;nbsp;&lt;/span&gt;&lt;br style=&quot;forced-color-adjust: none; font-family: Helvetica; font-size: 11px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;&quot;&gt;&lt;span style=&quot;font-family: Helvetica; font-size: 11px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; background-color: rgb(255, 255, 255); text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; float: none; display: inline !important;&quot;&gt;дешифровки&lt;/span&gt;">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-8" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="Сессия&amp;nbsp;&lt;br&gt;имеет ВПубАТ и ВПривАТ" vertex="1">
-          <mxGeometry height="80" width="80" x="940" y="-620" as="geometry" />
-        </mxCell>
         <mxCell id="QVwQwyUG0Fi7LHdL0sS_-9" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;" value="&lt;div&gt;ВТНС - временный токен неавторизованной сессии&lt;/div&gt;ВПубАТ - Временный публичный авторизованный токен&amp;nbsp;&lt;div&gt;ВПривАТ - Временный приватный авторизованный токен&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" vertex="1">
           <mxGeometry height="100" width="570" x="390" y="-1010" as="geometry" />
         </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-25" edge="1" parent="1" source="QVwQwyUG0Fi7LHdL0sS_-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;curved=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#009900;" target="QVwQwyUG0Fi7LHdL0sS_-8" value="удачное получение нового&lt;br&gt;ВПубАТ по средствам хеша&lt;br&gt;от ВПривАТ">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="1300" y="-690" />
-              <mxPoint x="980" y="-690" />
-            </Array>
-            <mxPoint x="1290" y="-730" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-26" edge="1" parent="1" source="QVwQwyUG0Fi7LHdL0sS_-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;curved=1;fontColor=#990000;" target="QVwQwyUG0Fi7LHdL0sS_-4" value="неудачное получение нового&lt;br&gt;ВПубАТ по средствам хеша&lt;br&gt;от ВПривАТ">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="1300" y="-860" />
-              <mxPoint x="440" y="-860" />
-            </Array>
-            <mxPoint x="1400" y="-800" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-23" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="сесия&amp;nbsp;&lt;br&gt;имеет&lt;br&gt;ВПривАТ" vertex="1">
-          <mxGeometry height="80" width="80" x="1260" y="-620" as="geometry" />
-        </mxCell>
         <mxCell id="QVwQwyUG0Fi7LHdL0sS_-27" parent="1" style="swimlane;whiteSpace=wrap;html=1;" value="Машина состояний для протокола HNTS( HentaiTrackerSecurity)" vertex="1">
-          <mxGeometry height="640" width="1050" x="300" y="-1030" as="geometry" />
+          <mxGeometry height="640" width="1580" x="10" y="-1020" as="geometry" />
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-5" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" source="QVwQwyUG0Fi7LHdL0sS_-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontColor=#009900;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="QVwQwyUG0Fi7LHdL0sS_-6" value="отправка ВТНС пары зашифрованной&lt;br&gt;по средствам hnts токена&amp;nbsp;&lt;div&gt;быстрее времени рефреша&amp;nbsp;&lt;br&gt;hnts токена&lt;/div&gt;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="640" y="420" as="sourcePoint" />
+            <mxPoint x="830" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-7" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" source="QVwQwyUG0Fi7LHdL0sS_-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;curved=1;exitX=0.961;exitY=0.673;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.027;entryY=0.709;entryDx=0;entryDy=0;entryPerimeter=0;fontColor=#990000;" target="QVwQwyUG0Fi7LHdL0sS_-4" value="отправка ВТНС не удалась,&lt;br&gt;или была слишком медленной или&lt;br&gt;бла получена ошибка&amp;nbsp;">
+          <mxGeometry relative="1" x="0.0598" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="531" y="442" />
+              <mxPoint x="680" y="442" />
+              <mxPoint x="680" y="540" />
+              <mxPoint x="370" y="540" />
+              <mxPoint x="370" y="437" />
+            </Array>
+            <mxPoint x="634.56" y="441.84000000000003" as="sourcePoint" />
+            <mxPoint x="530" y="440" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-4" parent="QVwQwyUG0Fi7LHdL0sS_-27" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="session&lt;br&gt;entripoint" vertex="1">
+          <mxGeometry height="80" width="80" x="454" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-10" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontColor=#009900;curved=1;entryX=0.079;entryY=0.201;entryDx=0;entryDy=0;entryPerimeter=0;" target="QVwQwyUG0Fi7LHdL0sS_-6" value="подьем WS при помоши&amp;nbsp;&lt;br&gt;ВПубНТ и отправка сообшений&amp;nbsp;&lt;br&gt;шифруемых ВПривНТ&lt;br&gt;отправка валидных&lt;br&gt;данных аунтентификации">
+          <mxGeometry relative="1" x="0.0684" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1010" y="400" />
+              <mxPoint x="1010" y="210" />
+              <mxPoint x="740" y="210" />
+              <mxPoint x="740" y="396" />
+            </Array>
+            <mxPoint x="880" y="400" as="sourcePoint" />
+            <mxPoint x="870" y="210" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-11" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" source="QVwQwyUG0Fi7LHdL0sS_-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;curved=1;exitX=0.908;exitY=0.805;exitDx=0;exitDy=0;exitPerimeter=0;fontColor=#990000;entryX=-0.003;entryY=0.671;entryDx=0;entryDy=0;entryPerimeter=0;" target="QVwQwyUG0Fi7LHdL0sS_-4" value="отправка инвалидных&lt;br&gt;данных аунтентификации">
+          <mxGeometry relative="1" x="0.1411" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="950" y="444" />
+              <mxPoint x="950" y="590" />
+              <mxPoint x="320" y="590" />
+              <mxPoint x="320" y="434" />
+            </Array>
+            <mxPoint x="690" y="560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="H1kaNhOR2qoWlq5IQJNH-5" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" source="QVwQwyUG0Fi7LHdL0sS_-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontColor=#009900;" target="QVwQwyUG0Fi7LHdL0sS_-8" value="отправка имени юзера&lt;br&gt;и хеша пароля через текуший&amp;nbsp;&lt;br&gt;WS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-6" parent="QVwQwyUG0Fi7LHdL0sS_-27" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="сессия&lt;br&gt;имеет долгий&lt;br&gt;токен" vertex="1">
+          <mxGeometry height="80" width="80" x="800" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-20" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" source="QVwQwyUG0Fi7LHdL0sS_-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.098;entryY=0.774;entryDx=0;entryDy=0;entryPerimeter=0;curved=1;fontColor=#009900;" target="QVwQwyUG0Fi7LHdL0sS_-8" value="успешная отправка\получение,&amp;nbsp;&lt;br&gt;шифровка\дишифровка и&amp;nbsp;&lt;br&gt;получение\отправка подтверждения&lt;br&gt;операции">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1250" y="440" />
+              <mxPoint x="1250" y="570" />
+              <mxPoint x="1040" y="570" />
+              <mxPoint x="1040" y="442" />
+            </Array>
+            <mxPoint x="1150" y="590" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-24" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" source="QVwQwyUG0Fi7LHdL0sS_-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontColor=#990000;" target="QVwQwyUG0Fi7LHdL0sS_-23" value="&lt;span style=&quot;font-family: Helvetica; font-size: 11px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; background-color: rgb(255, 255, 255); text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; float: none; display: inline !important;&quot;&gt;ошибка дишефровки или&lt;/span&gt;&lt;br style=&quot;forced-color-adjust: none; font-family: Helvetica; font-size: 11px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;&quot;&gt;&lt;span style=&quot;font-family: Helvetica; font-size: 11px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; background-color: rgb(255, 255, 255); text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; float: none; display: inline !important;&quot;&gt;получение ответа с ошибкой&amp;nbsp;&lt;/span&gt;&lt;br style=&quot;forced-color-adjust: none; font-family: Helvetica; font-size: 11px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;&quot;&gt;&lt;span style=&quot;font-family: Helvetica; font-size: 11px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; background-color: rgb(255, 255, 255); text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; float: none; display: inline !important;&quot;&gt;дешифровки&lt;/span&gt;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-8" parent="QVwQwyUG0Fi7LHdL0sS_-27" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="Сессия&amp;nbsp;&lt;br&gt;имеет ВПубАТ и ВПривАТ" vertex="1">
+          <mxGeometry height="80" width="80" x="1100" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-25" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" source="QVwQwyUG0Fi7LHdL0sS_-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;curved=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#009900;" target="QVwQwyUG0Fi7LHdL0sS_-8" value="удачное получение нового&lt;br&gt;ВПубАТ по средствам хеша&lt;br&gt;от ВПривАТ">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1460" y="310" />
+              <mxPoint x="1140" y="310" />
+            </Array>
+            <mxPoint x="1450" y="270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-26" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" source="QVwQwyUG0Fi7LHdL0sS_-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;curved=1;fontColor=#990000;exitX=0.781;exitY=0.048;exitDx=0;exitDy=0;exitPerimeter=0;" target="H1kaNhOR2qoWlq5IQJNH-1" value="неудачное получение нового&lt;br&gt;ВПубАТ по средствам хеша&lt;br&gt;от ВПривАТ">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1483" y="140" />
+              <mxPoint x="180" y="140" />
+            </Array>
+            <mxPoint x="1560" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-23" parent="QVwQwyUG0Fi7LHdL0sS_-27" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="сесия&amp;nbsp;&lt;br&gt;имеет&lt;br&gt;ВПривАТ" vertex="1">
+          <mxGeometry height="80" width="80" x="1420" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="H1kaNhOR2qoWlq5IQJNH-2" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" source="H1kaNhOR2qoWlq5IQJNH-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="QVwQwyUG0Fi7LHdL0sS_-4" value="&lt;font style=&quot;color: rgb(0, 153, 0);&quot;&gt;удачное получение&amp;nbsp;&lt;br&gt;Hnts токена&lt;/font&gt;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="H1kaNhOR2qoWlq5IQJNH-3" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" source="H1kaNhOR2qoWlq5IQJNH-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;curved=1;exitX=0.991;exitY=0.735;exitDx=0;exitDy=0;exitPerimeter=0;" target="H1kaNhOR2qoWlq5IQJNH-1" value="&lt;font style=&quot;color: rgb(153, 0, 0);&quot;&gt;не удачное получение hnts токена&lt;/font&gt;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="280" y="439" />
+              <mxPoint x="280" y="560" />
+              <mxPoint x="70" y="560" />
+              <mxPoint x="70" y="420" />
+            </Array>
+            <mxPoint x="140" y="560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="H1kaNhOR2qoWlq5IQJNH-1" parent="QVwQwyUG0Fi7LHdL0sS_-27" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="session&lt;br&gt;entripoint" vertex="1">
+          <mxGeometry height="80" width="80" x="140" y="380" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
