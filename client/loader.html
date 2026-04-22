@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>HentaiTraker</title>
+    <style>
+        :root {
+            --bgc:     #bfbfbf;
+            --textc:   #111111;
+            --ltextc:  #7d7d7d;
+            --accentc: #007bff;
+            --border:  #FF9CE9;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bgc:     #111111;
+                --textc:   #eeeeee;
+                --ltextc:  #bfbfbf;
+                --accentc: #375a7f;
+                --border:  #D10092;
+            }
+        }
+        body { margin: 0; background: var(--bgc); color: var(--textc); font-family: sans-serif; }
+
+        #checker-ui {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; height: 100vh; gap: 6px;
+        }
+        #loadgif { width: 10%; }
+
+        #status { margin: 6px 0 2px; font-size: 1.1em; }
+
+        #progress-container {
+            width: 300px; height: 15px; background: #333;
+            overflow: hidden; border: 7px ridge var(--border);
+        }
+        #progress-bar {
+            width: 0%; height: 100%; background: var(--accentc);
+            transition: width 0.25s ease;
+        }
+
+        /* Лог шагов */
+        #step-log {
+            width: 300px;
+            margin: 4px 0 0;
+            padding: 0;
+            list-style: none;
+            font-size: 0.78em;
+            color: var(--ltextc);
+            text-align: left;
+        }
+        #step-log li { padding: 1px 0; }
+        #step-log li::before         { content: '[✓] '; color: #00c853; }
+        #step-log li.pending::before { content: '[…] '; color: var(--accentc); }
+        #step-log li.error::before   { content: '[✗] '; color: #e53935; }
+        #step-log li.error           { color: #e53935; }
+
+        #slop {
+            text-align: center;
+            color: var(--ltextc);
+            font-size: 0.85em;
+            margin-top: 10px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+<div id="checker-ui">
+    <img id="loadgif" src="##CATGIRLGIF##"/>
+
+    <h2 id="status">Кто это у нас тут?</h2>
+
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <ul id="step-log"></ul>
+
+    <p id="slop">
+        HentaiTraker основан на технологии SPA<br>
+        (Single Page Application) с шифрованием<br>
+        WebSocket-сессии через ВТНС-протокол.<br>
+        Данные не хранятся в Cookies.
+    </p>
+</div>
+
+<div id="app" style="display: none;"></div>
+
+<script>
+(async function startLoading() {
+    const statusEl    = document.getElementById('status');
+    const progressBar = document.getElementById('progress-bar');
+    const appContainer = document.getElementById('app');
+    const checkerUI   = document.getElementById('checker-ui');
+    const stepLog     = document.getElementById('step-log');
+
+    // ── UI-хелперы ────────────────────────────────────────────────────────
+
+    function setStatus(text) { statusEl.textContent = text; }
+
+    function setProgress(pct) { progressBar.style.width = Math.min(pct, 100) + '%'; }
+
+    function addStep(text, cls) {
+        const li = document.createElement('li');
+        li.className  = cls || 'pending';
+        li.textContent = text;
+        stepLog.appendChild(li);
+        return li;
+    }
+
+    function doneStep(li, text)  { li.className = '';      li.textContent = text; }
+    function errorStep(li, text) { li.className = 'error'; li.textContent = text; }
+
+    function fatal(li, stepText, statusText) {
+        errorStep(li, stepText);
+        setStatus(statusText);
+        statusEl.style.color = '#e53935';
+    }
+
+    // ── Крипто-примитивы (совместимы с src/secure.rs) ────────────────────
+    //
+    //   key  = SHA-256(keyMaterial)
+    //   wire = nonce(12 байт) || ciphertext+tag
+
+    function generateToken(bytes) {
+        const buf = crypto.getRandomValues(new Uint8Array(bytes));
+        let bin = '';
+        for (const b of buf) bin += String.fromCharCode(b);
+        return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    async function deriveKey(keyMaterial) {
+        const raw = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(keyMaterial));
+        return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+    }
+
+    async function encryptJson(keyMaterial, payload) {
+        const key   = await deriveKey(keyMaterial);
+        const nonce = crypto.getRandomValues(new Uint8Array(12));
+        const plain = new TextEncoder().encode(JSON.stringify(payload));
+        const ct    = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, plain);
+        const out   = new Uint8Array(12 + ct.byteLength);
+        out.set(nonce, 0);
+        out.set(new Uint8Array(ct), 12);
+        return out;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Шаг 1 — Генерация ВТНС токенов
+    // ─────────────────────────────────────────────────────────────────────
+    setStatus('Инициализация...');
+    setProgress(5);
+    const s1 = addStep('Генерация ВТНС токенов...');
+    await new Promise(r => setTimeout(r, 120));
+
+    const pub_vtns  = generateToken(16);   // 16 байт → публичный (в URL)
+    const priv_vtns = generateToken(32);   // 32 байта → приватный (ключ шифрования)
+
+    doneStep(s1, 'ВТНС токены сгенерированы');
+    setProgress(15);
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Шаг 2 — Получение серверного ХНТС токена
+    // ─────────────────────────────────────────────────────────────────────
+    setStatus('Получение серверного токена...');
+    const s2 = addStep('Запрос ХНТС токена у сервера...');
+
+    let hntsToken;
+    try {
+        const resp = await fetch('/api/hnts/gettoken');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const body = await resp.json();
+        if (!body.token) throw new Error('Пустой ответ');
+        hntsToken = body.token;
+        doneStep(s2, 'ХНТС токен получен');
+        setProgress(35);
+    } catch (err) {
+        fatal(s2, 'Ошибка ХНТС: ' + err.message, 'Нет связи с сервером');
+        return;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Шаг 3 — Открытие WebSocket
+    // ─────────────────────────────────────────────────────────────────────
+    setStatus('Подключение WebSocket...');
+    const s3 = addStep('Установка соединения...');
+
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = `${proto}://${location.host}/api/hnts/ws/${pub_vtns}`;
+
+    let ws;
+    try {
+        ws = await new Promise((resolve, reject) => {
+            const sock = new WebSocket(wsUrl);
+            sock.binaryType = 'arraybuffer';
+            const timer = setTimeout(() => reject(new Error('Таймаут подключения')), 6000);
+            sock.onopen  = () => { clearTimeout(timer); resolve(sock); };
+            sock.onerror = () => { clearTimeout(timer); reject(new Error('Соединение отклонено')); };
+        });
+        doneStep(s3, 'WebSocket открыт');
+        setProgress(52);
+    } catch (err) {
+        fatal(s3, 'WS ошибка: ' + err.message, 'Не удалось подключиться к серверу');
+        return;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Шаг 4 — ВТНС рукопожатие (Entrypoint → LongToken)
+    // ─────────────────────────────────────────────────────────────────────
+    setStatus('ВТНС аутентификация...');
+    const s4 = addStep('Отправка ВТНС запроса...');
+
+    try {
+        const authMsg = await encryptJson(hntsToken, {
+            event:     'auth',
+            pub_vtns,
+            priv_vtns,
+        });
+        ws.send(authMsg);
+        setProgress(60);
+        doneStep(s4, 'ВТНС запрос отправлен');
+    } catch (err) {
+        fatal(s4, 'Ошибка шифрования: ' + err.message, 'ВТНС ошибка');
+        ws.close();
+        return;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Шаг 5 — Ожидание auth_ok
+    // ─────────────────────────────────────────────────────────────────────
+    const s5 = addStep('Ожидание подтверждения сервера...');
+
+    try {
+        await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Таймаут auth_ok')), 6000);
+
+            ws.onmessage = (e) => {
+                clearTimeout(timer);
+                ws.onmessage = null;
+                ws.onerror   = null;
+                try {
+                    const text = typeof e.data === 'string'
+                        ? e.data
+                        : new TextDecoder().decode(e.data);
+                    const msg = JSON.parse(text);
+                    if (msg.event === 'auth_ok') {
+                        resolve(msg);
+                    } else if (msg.event === 'error') {
+                        reject(new Error(msg.code || 'server error'));
+                    } else {
+                        reject(new Error('Неожиданный ответ: ' + msg.event));
+                    }
+                } catch {
+                    reject(new Error('Ошибка разбора ответа'));
+                }
+            };
+
+            ws.onerror = () => { clearTimeout(timer); reject(new Error('WS ошибка')); };
+            ws.onclose = () => { clearTimeout(timer); reject(new Error('WS закрыт')); };
+        });
+
+        doneStep(s5, 'Сервер подтвердил ВТНС');
+        setProgress(68);
+    } catch (err) {
+        fatal(s5, 'ВТНС отклонён: ' + err.message, 'Ошибка аутентификации');
+        ws.close();
+        return;
+    }
+
+    // Передаём WebSocket + токены в приложение
+    window.__VTNS__ = { pub_vtns, priv_vtns, ws };
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Шаг 6 — Загрузка JS-модуля приложения
+    // ─────────────────────────────────────────────────────────────────────
+    setStatus('Загрузка приложения...');
+    const s6 = addStep('Загрузка основного модуля...');
+
+    try {
+        const resp = await fetch('app');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+        const reader        = resp.body.getReader();
+        const contentLength = +resp.headers.get('Content-Length') || 0;
+        let received = 0;
+        const chunks = [];
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            received += value.length;
+            if (contentLength) {
+                const pct = 68 + Math.round((received / contentLength) * 30);
+                setProgress(pct);
+            }
+        }
+
+        doneStep(s6, 'Модуль загружен');
+        setProgress(99);
+
+        const blob      = new Blob(chunks, { type: 'application/javascript' });
+        const scriptUrl = URL.createObjectURL(blob);
+        const script    = document.createElement('script');
+
+        script.src     = scriptUrl;
+        script.onload  = () => {
+            setProgress(100);
+            checkerUI.style.display = 'none';
+            appContainer.style.display = 'block';
+        };
+        script.onerror = () => {
+            setStatus('Ошибка выполнения модуля');
+            statusEl.style.color = '#e53935';
+        };
+        document.body.appendChild(script);
+
+    } catch (err) {
+        fatal(s6, 'Ошибка: ' + err.message, 'Не удалось загрузить приложение');
+    }
+})();
+</script>
+</body>
+</html>

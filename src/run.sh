@@ -59,7 +59,10 @@ esbuild ./tmp/tempapp/app.ts \
   --minify \
   --sourcemap \
   --target=es6 \
-  --outfile=web/app.min.js
+  --outfile=./app.min.js
+
+replace_label ./tmp/tempapp/loader.html "##CATGIRLGIF##" $(img_to_base64 ../client/catgirl.gif)
+cp ./tmp/tempapp/loader.html ./loader.min.html
 
 rm -rf ./tmp/tempapp
 
