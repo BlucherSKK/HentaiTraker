@@ -205,3 +205,25 @@ BEGIN
         LIMIT  p_limit;
 END;
 $$;
+
+-- Поиск пользователя по имени (для логина)
+CREATE OR REPLACE FUNCTION db_get_user_by_name(p_name TEXT)
+RETURNS SETOF users AS $$
+    SELECT * FROM users WHERE name = p_name LIMIT 1;
+$$ LANGUAGE sql STABLE;
+
+-- Чаты пользователя через таблицу участников
+CREATE OR REPLACE FUNCTION db_get_user_chats(p_user_id INT)
+RETURNS SETOF chats AS $$
+    SELECT c.* FROM chats c
+    JOIN chat_members cm ON cm.chat_id = c.id
+    WHERE cm.user_id = p_user_id
+    ORDER BY c.time DESC;
+$$ LANGUAGE sql STABLE;
+
+-- Последние N постов для ленты
+CREATE OR REPLACE FUNCTION db_get_latest_posts(p_limit BIGINT)
+RETURNS SETOF posts AS $$
+    SELECT * FROM posts ORDER BY time DESC LIMIT p_limit;
+$$ LANGUAGE sql STABLE;
+

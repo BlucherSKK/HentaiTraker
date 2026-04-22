@@ -5,47 +5,43 @@ use rocket::get;
 use rocket::State;
 use rocket::futures::{SinkExt, StreamExt};
 use rocket_ws::{Channel, Message, WebSocket};
-use serde_json::Value;
+use serde_json::{Value, json};
 use super::session::{Session, SessionState};
 use super::router::EventRouter;
+use super::registry::{SessionRegistry, SessionEntry};
+use super::handlers;
 use crate::hnts::HntsState;
+use crate::db::Store;
 use crate::secure;
 
-// ─── Контекст состояния ───────────────────────────────────────────────────────
-//
-// Снимок нужных данных из Session, извлекается под коротким локом.
-// Позволяет отпустить Mutex до дешифрования.
+// ─── Снимок состояния (чтобы отпустить лок до дешифровки) ────────────────────
 
 enum StateCtx {
     Entrypoint,
-    LongToken(String),     // private_vtns
-    Authenticated(String), // priv_at
-    PrivateOnly(String),   // raw priv_at; хеш вычисляется по месту
+    LongToken(String),
+    Authenticated(String),
+    PrivateOnly(String),
 }
 
 fn state_ctx(sess: &Session) -> StateCtx {
     match &sess.state {
-        SessionState::Entrypoint => StateCtx::Entrypoint,
-        SessionState::LongToken { private_vtns, .. } => StateCtx::LongToken(private_vtns.clone()),
-        SessionState::Authenticated { priv_at, .. } => StateCtx::Authenticated(priv_at.clone()),
-        SessionState::PrivateOnly(p) => StateCtx::PrivateOnly(p.clone()),
+        SessionState::Entrypoint                        => StateCtx::Entrypoint,
+        SessionState::LongToken    { private_vtns, .. } => StateCtx::LongToken(private_vtns.clone()),
+        SessionState::Authenticated { priv_at, .. }     => StateCtx::Authenticated(priv_at.clone()),
+        SessionState::PrivateOnly(p)                    => StateCtx::PrivateOnly(p.clone()),
     }
 }
 
-// ─── Вспомогательные функции ──────────────────────────────────────────────────
+// ─── Хелперы ──────────────────────────────────────────────────────────────────
 
-/// Извлекает байты из WebSocket-сообщения.
-/// Text конвертируется в байты; управляющие фреймы (Ping/Pong/Close) → None.
 fn message_bytes(msg: Message) -> Option<Vec<u8>> {
     match msg {
         Message::Binary(b) => Some(b),
-        Message::Text(t) => Some(t.into_bytes()),
-        _ => None,
+        Message::Text(t)   => Some(t.into_bytes()),
+        _                  => None,
     }
 }
 
-/// Дешифрует данные ключом key, парсит JSON и возвращает (event, payload).
-/// Поле "event" обязательно должно быть строковым полем объекта.
 fn decrypt_and_parse(key: &str, data: &[u8]) -> Option<(String, Value)> {
     let plain = secure::decrypt(key, data)?;
     let json: Value = serde_json::from_slice(&plain).ok()?;
@@ -53,265 +49,258 @@ fn decrypt_and_parse(key: &str, data: &[u8]) -> Option<(String, Value)> {
     Some((event, json))
 }
 
-/// Генерирует новую пару токенов, отправляет зашифрованное уведомление клиенту
-/// и обновляет состояние сессии. Вызывается только если `sess.tokens_expired()`.
 async fn handle_token_refresh(sess: &mut Session) {
     let action = match &sess.state {
-        SessionState::LongToken { private_vtns, .. } => Some((false, private_vtns.clone())),
-        SessionState::Authenticated { priv_at, .. }  => Some((true,  priv_at.clone())),
+        SessionState::LongToken    { private_vtns, .. } => Some((false, private_vtns.clone())),
+        SessionState::Authenticated { priv_at, .. }     => Some((true,  priv_at.clone())),
         _ => None,
     };
     let Some((is_auth, old_key)) = action else { return };
-
     let new_pub  = secure::get_token(16);
     let new_priv = secure::get_token(32);
 
     if is_auth {
-        let msg = serde_json::json!({
-            "event":   "token_refresh",
-            "pub_at":  new_pub,
-            "priv_at": new_priv,
-        });
-        let enc = secure::encrypt(&old_key, msg.to_string().as_bytes());
+        let enc = secure::encrypt(&old_key, json!({
+            "event": "token_refresh", "pub_at": new_pub, "priv_at": new_priv,
+        }).to_string().as_bytes());
         let _ = sess.send_binary(enc).await;
         sess.state = SessionState::Authenticated {
-            pub_at:    new_pub,
-            priv_at:   new_priv,
-            issued_at: Instant::now(),
+            pub_at: new_pub, priv_at: new_priv, issued_at: Instant::now(),
         };
     } else {
-        let msg = serde_json::json!({
-            "event":       "token_refresh",
-            "public_vtns": new_pub,
-            "private_vtns": new_priv,
-        });
-        let enc = secure::encrypt(&old_key, msg.to_string().as_bytes());
+        let enc = secure::encrypt(&old_key, json!({
+            "event": "token_refresh", "public_vtns": new_pub, "private_vtns": new_priv,
+        }).to_string().as_bytes());
         let _ = sess.send_binary(enc).await;
         sess.state = SessionState::LongToken {
-            public_vtns:  new_pub,
-                private_vtns: new_priv,
-                    issued_at:    Instant::now(),
+            public_vtns: new_pub, private_vtns: new_priv, issued_at: Instant::now(),
         };
     }
 }
 
 // ─── WebSocket route ──────────────────────────────────────────────────────────
 
-/// Точка входа WebSocket-сессии.
-///
-/// ## Протокол состояний
-///
-/// ```
-/// Entrypoint
-///   ← binary( encrypt(hnts_token, { event:"auth", pub_vtns, priv_vtns }) )
-///   → send json { event:"auth_ok" }
-///   → LongToken
-///
-/// LongToken
-///   ← binary( encrypt(priv_vtns, { event:"login", username, password }) )
-///   → send binary( encrypt(priv_vtns, { event:"login_ok", pub_at, priv_at }) )
-///   → Authenticated
-///
-/// Authenticated
-///   ← binary( encrypt(priv_at, { event:"<name>", ... }) )
-///   → dispatch(EventRouter) по полю "event"
-///   → если дешифровка провалилась → PrivateOnly
-///
-/// PrivateOnly
-///   ← plaintext json { event:"reauth", hash:"<sha256_hex(priv_at)>" }
-///   → send binary( encrypt(priv_at, { event:"reauth_ok", pub_at }) ) + Authenticated
-///   → или json { event:"reauth_failed" } + Entrypoint
-/// ```
-///
-/// Route: `GET /api/hnts/ws/<pub_vtns>`
 #[get("/ws/<pub_vtns>")]
-pub fn ws(ws: WebSocket, pub_vtns: String, hnts: &State<HntsState>) -> Channel<'static> {
-    let hnts = hnts.inner().clone();
+pub fn ws(
+    ws:       WebSocket,
+    pub_vtns: String,
+    hnts:     &State<HntsState>,
+    store:    &State<Arc<Store>>,
+    registry: &State<SessionRegistry>,
+) -> Channel<'static> {
+    let hnts     = hnts.inner().clone();
+    let store    = Arc::clone(store.inner());
+    let registry = registry.inner().clone();
 
-    ws.channel(move |stream| {
-        Box::pin(async move {
-            let (mut sink, mut source) = stream.split();
-            let (tx, mut rx) = mpsc::channel::<Message>(32);
+    ws.channel(move |stream| Box::pin(async move {
+        let (mut sink, mut source) = stream.split();
+        let (tx, mut rx)           = mpsc::channel::<Message>(32);
 
-            // Отдельная задача-писатель: сериализует отправку в сокет.
-            tokio::spawn(async move {
-                while let Some(msg) = rx.recv().await {
-                    if sink.send(msg).await.is_err() {
-                        break;
+        // Задача-писатель: сериализует запись в сокет
+        tokio::spawn(async move {
+            while let Some(msg) = rx.recv().await {
+                if sink.send(msg).await.is_err() { break; }
+            }
+        });
+
+        let session = Arc::new(Mutex::new(Session::new(tx, pub_vtns)));
+
+        // Broadcast-канал: plain JSON → воркер шифрует → send_binary
+        let (bcast_tx, mut bcast_rx) = mpsc::channel::<Value>(64);
+        {
+            let mut s     = session.lock().await;
+            s.store        = Some(Arc::clone(&store));
+            s.broadcast_tx = Some(bcast_tx);
+        }
+        let bcast_sess = Arc::clone(&session);
+        tokio::spawn(async move {
+            while let Some(msg) = bcast_rx.recv().await {
+                let s = bcast_sess.lock().await;
+                s.send_encrypted(&msg).await;
+            }
+        });
+
+        // Регистрируем обработчики аутентифицированных событий
+        let reg = Arc::new(registry.clone());
+        let mut router = EventRouter::new();
+        {
+            let r = Arc::clone(&reg);
+            router.on("message_create", move |sess, data| {
+                let r = Arc::clone(&r);
+                async move { handlers::message_create(sess, data, r).await }
+            });
+        }
+        router.on("message_list", |sess, data| async move {
+            handlers::message_list(sess, data).await
+        });
+        router.on("chat_list", |sess, data| async move {
+            handlers::chat_list(sess, data).await
+        });
+        {
+            let r = Arc::clone(&reg);
+            router.on("chat_create", move |sess, data| {
+                let r = Arc::clone(&r);
+                async move { handlers::chat_create(sess, data, r).await }
+            });
+        }
+        let router = Arc::new(router);
+
+        // ── Главный цикл сообщений ─────────────────────────────────────────────
+        while let Some(result) = source.next().await {
+            let raw = match result { Ok(m) => m, Err(_) => break };
+            let raw = match message_bytes(raw) { Some(b) => b, None => continue };
+
+            let ctx = {
+                let mut s = session.lock().await;
+                if s.tokens_expired() { handle_token_refresh(&mut s).await; }
+                s.last_activity = Instant::now();
+                state_ctx(&s)
+            };
+
+            match ctx {
+                // ── Entrypoint ─────────────────────────────────────────────────
+                StateCtx::Entrypoint => {
+                    let Some(plain) = hnts.try_decrypt(&raw).await else {
+                        let s = session.lock().await;
+                        let _ = s.send_json(&json!({ "event": "error", "code": "decrypt_failed" })).await;
+                        continue;
+                    };
+                    let Ok(val) = serde_json::from_slice::<Value>(&plain) else { continue };
+                    if val["event"].as_str() != Some("auth") { continue; }
+
+                    let pub_v  = val["pub_vtns"].as_str().map(str::to_string);
+                    let priv_v = val["priv_vtns"].as_str().map(str::to_string);
+                    match (pub_v, priv_v) {
+                        (Some(pv), Some(pvt)) => {
+                            let mut s = session.lock().await;
+                            if pv != s.pub_vtns {
+                                let _ = s.send_json(&json!({ "event": "error", "code": "vtns_mismatch" })).await;
+                                continue;
+                            }
+                            s.state = SessionState::LongToken {
+                                public_vtns: pv, private_vtns: pvt, issued_at: Instant::now(),
+                            };
+                            let _ = s.send_json(&json!({ "event": "auth_ok" })).await;
+                        }
+                        _ => continue,
                     }
                 }
-            });
 
-            let session = Arc::new(Mutex::new(Session::new(tx, pub_vtns)));
+                // ── LongToken (ожидаем login) ──────────────────────────────────
+                StateCtx::LongToken(priv_vtns) => {
+                    let Some((event, payload)) = decrypt_and_parse(&priv_vtns, &raw) else {
+                        let s = session.lock().await;
+                        let _ = s.send_json(&json!({ "event": "error", "code": "decrypt_failed" })).await;
+                        continue;
+                    };
+                    if event != "login" { continue; }
 
-            // ── Регистрация обработчиков приложения ───────────────────────────
-            let mut router = EventRouter::new();
-            // router.on("message_create", |sess, data| async move { ... });
-            // router.on("message_list",   |sess, data| async move { ... });
-            // router.on("chat_create",    |sess, data| async move { ... });
-            // router.on("chat_list",      |sess, data| async move { ... });
-            // router.on("post_create",    |sess, data| async move { ... });
-            let router = Arc::new(router);
-            // ─────────────────────────────────────────────────────────────────
+                    // Извлекаем данные без удержания лока во время DB-запроса
+                    let (username, password, session_id, bcast_tx) = {
+                        let s = session.lock().await;
+                        (
+                            payload["username"].as_str().unwrap_or("").to_string(),
+                         payload["password"].as_str().unwrap_or("").to_string(),
+                         s.id.clone(),
+                         s.broadcast_tx.clone(),
+                        )
+                    };
 
-            while let Some(result) = source.next().await {
-                let raw_msg = match result {
-                    Ok(m) => m,
-                 Err(_) => break,
-                };
-                let raw_bytes = match message_bytes(raw_msg) {
-                    Some(b) => b,
-                 None => continue,
-                };
-
-                // Единственный лок на итерацию: refresh + last_activity + snapshot.
-                let ctx = {
-                    let mut sess = session.lock().await;
-                    if sess.tokens_expired() {
-                        handle_token_refresh(&mut sess).await;
-                    }
-                    sess.last_activity = Instant::now();
-                    state_ctx(&sess)
-                };
-
-                match ctx {
-                    // ── Entrypoint ────────────────────────────────────────────
-                    StateCtx::Entrypoint => {
-                        let plain = match hnts.try_decrypt(&raw_bytes).await {
-                            Some(p) => p,
-                 None => {
-                     let sess = session.lock().await;
-                     let _ = sess.send_json(&serde_json::json!({
-                         "event": "error",
-                         "code":  "decrypt_failed",
-                     })).await;
-                     continue;
-                 }
-                        };
-                        let json: Value = match serde_json::from_slice(&plain) {
-                            Ok(v) => v,
-                 Err(_) => continue,
-                        };
-                        if json.get("event").and_then(Value::as_str) != Some("auth") {
-                            continue;
+                    // Проверяем учётные данные (без лока)
+                    let login_result = async {
+                        let user = store.get_user_by_name(&username).await
+                        .map_err(|_| "db_error")?
+                        .ok_or("user_not_found")?;
+                        if !secure::verify_password(&password, &user.pass) {
+                            return Err("wrong_password");
                         }
-                        let pub_v  = json.get("pub_vtns").and_then(Value::as_str).map(str::to_string);
-                        let priv_v = json.get("priv_vtns").and_then(Value::as_str).map(str::to_string);
-                        match (pub_v, priv_v) {
-                            (Some(pub_v), Some(priv_v)) => {
-                                let mut sess = session.lock().await;
-                                if pub_v != sess.pub_vtns {
-                                    let _ = sess.send_json(&serde_json::json!({
-                                        "event": "error",
-                                        "code":  "vtns_mismatch",
-                                    })).await;
-                                    continue;
+                        Ok(user)
+                    }.await;
+
+                    match login_result {
+                        Ok(user) => {
+                            let pub_at  = secure::get_token(16);
+                            let priv_at = secure::get_token(32);
+
+                            // Подписываем сессию на все чаты пользователя
+                            if let (Some(tx), Ok(chats)) =
+                                (bcast_tx, store.get_user_chats(user.id).await)
+                                {
+                                    for chat in chats {
+                                        registry.join(chat.id, SessionEntry {
+                                            session_id:   session_id.clone(),
+                                                      user_id:      user.id,
+                                                      broadcast_tx: tx.clone(),
+                                        }).await;
+                                    }
                                 }
-                                sess.state = SessionState::LongToken {
-                                    public_vtns:  pub_v,
-                                        private_vtns: priv_v,
-                                            issued_at:    Instant::now(),
+
+                                let enc = secure::encrypt(&priv_vtns, json!({
+                                    "event":   "login_ok",
+                                    "pub_at":  pub_at,
+                                    "priv_at": priv_at,
+                                }).to_string().as_bytes());
+
+                                let mut s = session.lock().await;
+                                let _ = s.send_binary(enc).await;
+                                s.user_id = Some(user.id);
+                                s.state   = SessionState::Authenticated {
+                                    pub_at, priv_at, issued_at: Instant::now(),
                                 };
-                                let _ = sess.send_json(&serde_json::json!({
-                                    "event": "auth_ok",
-                                })).await;
-                            }
-                            _ => continue,
+                        }
+                        Err(code) => {
+                            let s = session.lock().await;
+                            let _ = s.send_json(&json!({ "event": "login_failed", "code": code })).await;
                         }
                     }
+                }
 
-                    // ── LongToken ─────────────────────────────────────────────
-                    StateCtx::LongToken(private_vtns) => {
-                        let (event, payload) = match decrypt_and_parse(&private_vtns, &raw_bytes) {
-                            Some(v) => v,
-                 None => {
-                     let sess = session.lock().await;
-                     let _ = sess.send_json(&serde_json::json!({
-                         "event": "error",
-                         "code":  "decrypt_failed",
-                     })).await;
-                     continue;
-                 }
-                        };
-                        if event != "login" {
-                            continue;
+                // ── Authenticated ──────────────────────────────────────────────
+                StateCtx::Authenticated(priv_at) => {
+                    match decrypt_and_parse(&priv_at, &raw) {
+                        Some((event, payload)) => {
+                            router.dispatch(&event, Arc::clone(&session), payload).await;
                         }
-
-                        // TODO: проверить payload["username"] / payload["password"] через sess.store
-                        let _ = payload;
-
-                        let pub_at  = secure::get_token(16);
-                        let priv_at = secure::get_token(32);
-                        let response = serde_json::json!({
-                            "event":   "login_ok",
-                            "pub_at":  pub_at,
-                            "priv_at": priv_at,
-                        });
-                        let enc = secure::encrypt(&private_vtns, response.to_string().as_bytes());
-                        let mut sess = session.lock().await;
-                        let _ = sess.send_binary(enc).await;
-                        sess.state = SessionState::Authenticated {
-                            pub_at,
-                            priv_at,
-                            issued_at: Instant::now(),
-                        };
-                    }
-
-                    // ── Authenticated ─────────────────────────────────────────
-                    StateCtx::Authenticated(priv_at) => {
-                        match decrypt_and_parse(&priv_at, &raw_bytes) {
-                            Some((event, payload)) => {
-                                router.dispatch(&event, Arc::clone(&session), payload).await;
-                            }
-                            None => {
-                                // Дешифровка провалилась → pub_at скомпрометирован.
-                                let mut sess = session.lock().await;
-                                sess.state = SessionState::PrivateOnly(priv_at);
-                                let _ = sess.send_json(&serde_json::json!({
-                                    "event": "reauth_required",
-                                })).await;
-                            }
+                        None => {
+                            let mut s = session.lock().await;
+                            s.state = SessionState::PrivateOnly(priv_at);
+                            let _ = s.send_json(&json!({ "event": "reauth_required" })).await;
                         }
                     }
+                }
 
-                    // ── PrivateOnly ───────────────────────────────────────────
-                    StateCtx::PrivateOnly(priv_at) => {
-                        let expected_hash = secure::token_hash(&priv_at);
-                        let incoming: Value = match serde_json::from_slice(&raw_bytes) {
-                            Ok(v) => v,
-                 Err(_) => continue,
+                // ── PrivateOnly ────────────────────────────────────────────────
+                StateCtx::PrivateOnly(priv_at) => {
+                    let expected = secure::token_hash(&priv_at);
+                    let Ok(incoming) = serde_json::from_slice::<Value>(&raw) else { continue };
+                    if incoming["event"].as_str() != Some("reauth") { continue; }
+                    let provided = incoming["hash"].as_str().unwrap_or("");
+
+                    let mut s = session.lock().await;
+                    if provided == expected {
+                        let new_pub  = secure::get_token(16);
+                        let new_priv = secure::get_token(32);
+                        let enc = secure::encrypt(&priv_at, json!({
+                            "event": "reauth_ok", "pub_at": new_pub,
+                        }).to_string().as_bytes());
+                        let _ = s.send_binary(enc).await;
+                        s.state = SessionState::Authenticated {
+                            pub_at: new_pub, priv_at: new_priv, issued_at: Instant::now(),
                         };
-                        if incoming.get("event").and_then(Value::as_str) != Some("reauth") {
-                            continue;
-                        }
-                        let provided = incoming.get("hash").and_then(Value::as_str).unwrap_or("");
-
-                        let mut sess = session.lock().await;
-                        if provided == expected_hash {
-                            let new_pub  = secure::get_token(16);
-                            let new_priv = secure::get_token(32);
-                            let response = serde_json::json!({
-                                "event":  "reauth_ok",
-                                "pub_at": new_pub,
-                            });
-                            let enc = secure::encrypt(&priv_at, response.to_string().as_bytes());
-                            let _ = sess.send_binary(enc).await;
-                            sess.state = SessionState::Authenticated {
-                                pub_at:    new_pub,
-                                priv_at:   new_priv,
-                                issued_at: Instant::now(),
-                            };
-                        } else {
-                            sess.state = SessionState::Entrypoint;
-                            let _ = sess.send_json(&serde_json::json!({
-                                "event": "reauth_failed",
-                            })).await;
-                        }
+                    } else {
+                        s.state = SessionState::Entrypoint;
+                        let _ = s.send_json(&json!({ "event": "reauth_failed" })).await;
                     }
                 }
             }
+        }
 
-            Ok(())
-        })
-    })
+        // Отписываем сессию от всех чатов при отключении
+        {
+            let s = session.lock().await;
+            registry.leave(&s.id).await;
+        }
+
+        Ok(())
+    }))
 }

@@ -1,7 +1,5 @@
-pub mod session;
+pub mod handlers;
+pub mod registry;
 pub mod router;
+pub mod session;
 pub mod socket;
-
-pub use session::{Session, SessionState};
-pub use router::EventRouter;
-pub use socket::ws;

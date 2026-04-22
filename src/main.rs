@@ -1,54 +1,25 @@
 #[macro_use] extern crate rocket;
-use rocket::response::content::{RawHtml, RawJavaScript, RawJson};
-use rocket::response::{self, Responder, Response};
-use rocket::Request;
-use tokio::time::{sleep, Duration};
-use rocket::http::Header;
+
 use std::io::Cursor;
-use serde_json;
+use std::sync::Arc;
+
+use rocket::http::Header;
+use rocket::response::content::{RawHtml, RawJson};
 use rocket::response::stream::ReaderStream;
-use rocket::get;
-use rocket::serde::{Serialize, Deserialize, json::Json}; // Добавили Json сюда
-use std::sync::RwLock; // Используем RwLock вместо Mutex для скорости (много читателей, один писатель)
-use rocket::State;
-mod secure;
+use rocket::response::{self, Responder, Response};
+use rocket::{Request, State};
+use tokio::time::Duration;
+
+mod db;
 mod handle;
 mod hnts;
-mod db;
+mod secure;
 
-pub struct AppState {
-    // Храним уже готовую JSON строку
-    pub cached_feed: RwLock<String>,
-}
+use db::Store;
+use handle::registry::SessionRegistry;
+use hnts::HntsState;
 
-
-#[derive(Serialize)]
-#[serde(crate = "rocket::serde")]
-pub struct PostResponse {
-    pub message: String,
-    pub status: String,
-}
-
-#[get("/getfeed")]
-pub async fn get_feed(state: &State<AppState>) -> RawJson<String> {
-    // Искусственная задержка (по желанию)
-    sleep(Duration::from_secs(1)).await;
-
-    // Читаем закэшированную строку из состояния
-    let cache = state.cached_feed.read().expect("Lock failed");
-
-    // Возвращаем как чистый JSON
-    RawJson(cache.clone())
-}
-
-
-#[get("/")]
-fn index() -> RawHtml<&'static str> {
-    // Путь указывается относительно текущего .rs файла
-    let html = include_str!("./web/loader.html");
-    RawHtml(html)
-}
-
+// ─── Content-Length passthrough для стримов ────────────────────────────────────
 
 pub struct StreamWithLength<R>(R, u64);
 
@@ -60,79 +31,92 @@ impl<'r, R: Responder<'r, 'r>> Responder<'r, 'r> for StreamWithLength<R> {
     }
 }
 
-#[get("/app")]
-fn app() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
-    let app_content = include_str!("./web/app.min.js").as_bytes().to_vec();
-    let total_len = app_content.len() as u64;
-    let chunk_size = 1024;
-    let delay = if cfg!(feature = "QA") {100000} else {0};
+// ─── Статические маршруты ─────────────────────────────────────────────────────
 
-    let stream = ReaderStream! {
-        let mut offset = 0;
-        let total = app_content.len();
-        while offset < total {
-            let end = std::cmp::min(offset + chunk_size, total);
-            let chunk = app_content[offset..end].to_vec();
-            tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
-            yield Cursor::new(chunk);
-            offset = end;
-        }
-    };
-
-    StreamWithLength(stream, total_len)
+#[get("/")]
+fn index() -> RawHtml<&'static str> {
+    RawHtml(include_str!("./loader.min.html"))
 }
 
-
+#[get("/app")]
+fn app_js() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
+    let data  = include_str!("./app.min.js").as_bytes().to_vec();
+    let total = data.len() as u64;
+    let delay = if cfg!(feature = "QA") { 100_000u64 } else { 0 };
+    let stream = ReaderStream! {
+        let mut off = 0usize;
+        let len = data.len();
+        while off < len {
+            let end = (off + 1024).min(len);
+            tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
+            yield Cursor::new(data[off..end].to_vec());
+            off = end;
+        }
+    };
+    StreamWithLength(stream, total)
+}
 
 #[get("/app.min.js.map")]
-fn appmap() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
-    let app_content = include_str!("./web/app.min.js.map").as_bytes().to_vec();
-    let total_len = app_content.len() as u64;
-    let chunk_size = 1024;
-
+fn app_map() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
+    let data  = include_str!("./app.min.js.map").as_bytes().to_vec();
+    let total = data.len() as u64;
     let stream = ReaderStream! {
-        let mut offset = 0;
-        let total = app_content.len();
-        while offset < total {
-            let end = std::cmp::min(offset + chunk_size, total);
-            let chunk = app_content[offset..end].to_vec();
+        let mut off = 0usize;
+        let len = data.len();
+        while off < len {
+            let end = (off + 1024).min(len);
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-            yield Cursor::new(chunk);
-            offset = end;
+            yield Cursor::new(data[off..end].to_vec());
+            off = end;
         }
     };
-
-    StreamWithLength(stream, total_len)
+    StreamWithLength(stream, total)
 }
 
+// ─── REST API ─────────────────────────────────────────────────────────────────
 
-use crate::db::Post;
-use crate::db::Tags;
+/// Последние 20 постов для /feeds. Доступно без аутентификации.
+#[get("/getfeed")]
+async fn get_feed(store: &State<Arc<Store>>) -> RawJson<String> {
+    match store.get_latest_posts(20).await {
+        Ok(posts) => RawJson(serde_json::to_string(&posts).unwrap_or_else(|_| "[]".into())),
+        Err(e) => {
+            log::error!("get_feed: {e}");
+            RawJson("[]".into())
+        }
+    }
+}
+
+// ─── Запуск ───────────────────────────────────────────────────────────────────
 
 #[rocket::main]
 async fn main() {
+    dotenvy::dotenv().ok();
     env_logger::init();
-    // 1. Создаем начальные данные (динамический массив)
-    // Убедись, что структура Post объявлена выше или импортирована
-    let initial_posts: Vec<Post> = vec![
-        Post::new(1, Some("x".to_string()), "we".to_string(), vec![Tags::Hentai])
-    ];
 
-    // 2. Сериализуем массив в JSON-строку заранее
-    let json_string = serde_json::to_string(&initial_posts)
-    .expect("Ошибка при создании JSON");
+    let db_url    = std::env::var("DATABASE_URL").expect("DATABASE_URL не задан");
+    let redis_url = std::env::var("REDIS_URL").expect("REDIS_URL не задан");
 
-    // 3. Создаем стейт с кэшем
-    let state = AppState {
-        cached_feed: RwLock::new(json_string),
-    };
+    let store = Arc::new(
+        Store::init(&db_url, &redis_url)
+        .await
+        .expect("Инициализация Store не удалась"),
+    );
 
-    let _ = rocket::build()
-    .manage(state)
-    .mount("/", routes![index, app, appmap])
-    .mount("/api", routes![get_feed])
+    let hnts = HntsState::new();
+    // Ротация ХНТС токена каждые 15 минут (старый ещё живёт одну ротацию)
+    hnts.start_auto_refresh(Duration::from_secs(15 * 60));
+
+    let registry = SessionRegistry::new();
+
+    rocket::build()
+    .manage(Arc::clone(&store))  // Arc<Store>       — REST + WS handlers
+    .manage(hnts)                // HntsState        — /api/hnts/*
+    .manage(registry)            // SessionRegistry  — трансляция сообщений
+    .mount("/",         routes![index, app_js, app_map])
+    .mount("/api",      routes![get_feed])
+    .mount("/api/hnts", routes![hnts::get_token, handle::socket::ws])
     .launch()
     .await
-    ;
+    .expect("Rocket упал");
 }
-
