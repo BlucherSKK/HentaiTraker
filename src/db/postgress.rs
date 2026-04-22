@@ -1,50 +1,7 @@
-use chrono::NaiveDateTime;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::{Executor, FromRow};
 use std::time::Duration;
-use serde::Serialize;
 
-#[derive(Debug, FromRow, Serialize)]
-pub struct User {
-    pub id: i32,
-    pub name: String,
-    pub pass: String,
-    pub last_visit: NaiveDateTime,
-    pub roles: Option<String>,
-    pub avatar: Option<String>,
-    pub tags: Option<String>,
-}
-
-#[derive(Debug, FromRow, Serialize)]
-pub struct Post {
-    pub id: i32,
-    pub title: Option<String>,
-    pub content: String,
-    pub files: Option<String>,
-    pub author_id: i32,
-    pub time: NaiveDateTime,
-    pub tags: Option<String>,
-}
-
-#[derive(Debug, FromRow, Serialize)]
-pub struct Chat {
-    pub id: i32,
-    pub title: Option<String>,
-    pub content: String,
-    pub images: Option<String>,
-    pub author_id: i32,
-    pub time: NaiveDateTime,
-}
-
-#[derive(Debug, FromRow, Serialize)]
-pub struct Message {
-    pub id: i32,
-    pub content: String,
-    pub files: Option<String>,
-    pub author_id: i32,
-    pub chat_id: i32,
-    pub time: NaiveDateTime,
-}
 
 #[derive(Clone)]
 pub struct Database {

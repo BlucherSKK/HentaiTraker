@@ -106,7 +106,7 @@ fn appmap() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
 }
 
 
-use crate::db::postgress::Post;
+use crate::db::Post;
 use crate::db::Tags;
 
 #[rocket::main]

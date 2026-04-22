@@ -1,10 +1,12 @@
-
 use log::{info, debug, error};
-
+use sqlx::{Executor, FromRow};
 pub mod postgress;
-use postgress::Post;
 use chrono::Utc; // Понадобится для генерации текущего времени
+use serde::Serialize;
+use chrono::NaiveDateTime;
 
+
+#[derive(Debug, Serialize)]
 pub enum Tags {
     Hentai,
     Any
@@ -16,6 +18,50 @@ pub enum AttachmentType {
     Gif,
     Jpg
 }
+
+#[derive(Debug, FromRow, Serialize)]
+pub struct User {
+    pub id: i32,
+    pub name: String,
+    pub pass: String,
+    pub last_visit: NaiveDateTime,
+    pub roles: Option<String>,
+    pub avatar: Option<String>,
+    pub tags: Option<Vec<Tags>>,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+pub struct Post {
+    pub id: i32,
+    pub title: Option<String>,
+    pub content: String,
+    pub files: Option<String>,
+    pub author_id: i32,
+    pub time: NaiveDateTime,
+    pub tags:Option<Vec<Tags>>,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+pub struct Chat {
+    pub id: i32,
+    pub title: Option<String>,
+    pub content: String,
+    pub images: Option<String>,
+    pub author_id: i32,
+    pub time: NaiveDateTime,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+pub struct Message {
+    pub id: i32,
+    pub content: String,
+    pub files: Option<String>,
+    pub author_id: i32,
+    pub chat_id: i32,
+    pub time: NaiveDateTime,
+}
+
+
 
 
 const SERIALIZE_TAGS_RESOLUTION: u8 = 3;
