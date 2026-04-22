@@ -3,38 +3,33 @@ use std::sync::Arc;
 use tokio::sync::{RwLock, mpsc};
 use serde_json::Value;
 
-/// Запись об одной активной WS-сессии, подписанной на чат.
+/// Запись об одной активной WS-сессии в конкретном чате.
 pub struct SessionEntry {
     pub session_id:   String,
     pub user_id:      i32,
-    /// Sender-конец broadcast-канала сессии.
-    /// Receiver читает воркер, который шифрует и отправляет JSON клиенту.
+    /// Sender конца broadcast-канала; receiver читает воркер сессии.
     pub broadcast_tx: mpsc::Sender<Value>,
 }
 
-/// Реестр сессий по чатам. Shared-state через Rocket.
-/// Clone — это дешёвый Arc-clone.
+/// Реестр сессий по чатам.
+/// `Clone` — дешёвый Arc-clone; подходит как Rocket managed state.
 #[derive(Clone, Default)]
 pub struct SessionRegistry {
     inner: Arc<RwLock<HashMap<i32, Vec<SessionEntry>>>>,
 }
 
 impl SessionRegistry {
-    pub fn new() -> Self {
-        Self::default()
-    }
+    pub fn new() -> Self { Self::default() }
 
-    /// Подписать сессию на чат (вызывается после логина).
+    /// Подписать сессию на чат. Вызывается после login или chat_join.
     pub async fn join(&self, chat_id: i32, entry: SessionEntry) {
-        self.inner
-        .write()
-        .await
+        self.inner.write().await
         .entry(chat_id)
         .or_default()
         .push(entry);
     }
 
-    /// Удалить все подписки сессии (вызывается при отключении).
+    /// Отписать сессию от всех чатов. Вызывается при отключении сокета.
     pub async fn leave(&self, session_id: &str) {
         let mut map = self.inner.write().await;
         for entries in map.values_mut() {

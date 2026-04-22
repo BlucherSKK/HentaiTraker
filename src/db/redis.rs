@@ -1,6 +1,5 @@
 use deadpool_redis::{Config, Pool, Runtime, Connection};
 use deadpool_redis::redis::AsyncCommands;
-use log::warn;
 
 /// Async Redis client backed by a deadpool connection pool.
 /// All operations are fire-and-forget on failure — a broken Redis

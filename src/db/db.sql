@@ -206,24 +206,54 @@ BEGIN
 END;
 $$;
 
--- Поиск пользователя по имени (для логина)
+-- ── Новые функции ────────────────────────────────────────────
+
 CREATE OR REPLACE FUNCTION db_get_user_by_name(p_name TEXT)
-RETURNS SETOF users AS $$
-    SELECT * FROM users WHERE name = p_name LIMIT 1;
-$$ LANGUAGE sql STABLE;
+RETURNS SETOF users LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM users WHERE name = p_name LIMIT 1;
+END;
+$$;
 
--- Чаты пользователя через таблицу участников
-CREATE OR REPLACE FUNCTION db_get_user_chats(p_user_id INT)
-RETURNS SETOF chats AS $$
-    SELECT c.* FROM chats c
-    JOIN chat_members cm ON cm.chat_id = c.id
-    WHERE cm.user_id = p_user_id
-    ORDER BY c.time DESC;
-$$ LANGUAGE sql STABLE;
+CREATE OR REPLACE FUNCTION db_get_chat_by_id(p_chat_id INT)
+RETURNS SETOF chats LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM chats WHERE id = p_chat_id;
+END;
+$$;
 
--- Последние N постов для ленты
+-- Проверка членства: возвращает одну строку если пользователь уже в чате.
+CREATE OR REPLACE FUNCTION db_is_chat_member(p_chat_id INT, p_member_id INT)
+RETURNS BOOLEAN LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM cross_chat_members
+        WHERE chat_id = p_chat_id AND member_id = p_member_id
+    );
+END;
+$$;
+
+-- Список чатов пользователя через cross_chat_members.
+CREATE OR REPLACE FUNCTION db_get_user_chats(p_member_id INT)
+RETURNS SETOF chats LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    RETURN QUERY
+        SELECT c.* FROM chats c
+        JOIN cross_chat_members ccm ON ccm.chat_id = c.id
+        WHERE ccm.member_id = p_member_id
+        ORDER BY c.time DESC;
+END;
+$$;
+
+-- Последние N постов для ленты.
 CREATE OR REPLACE FUNCTION db_get_latest_posts(p_limit BIGINT)
-RETURNS SETOF posts AS $$
-    SELECT * FROM posts ORDER BY time DESC LIMIT p_limit;
-$$ LANGUAGE sql STABLE;
+RETURNS SETOF posts LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    RETURN QUERY
+        SELECT * FROM posts
+        ORDER BY time DESC
+        LIMIT p_limit;
+END;
+$$;
+
 

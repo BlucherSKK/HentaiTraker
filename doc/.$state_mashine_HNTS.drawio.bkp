@@ -30,7 +30,7 @@
             <mxPoint x="530" y="440" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-4" parent="QVwQwyUG0Fi7LHdL0sS_-27" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="session&lt;br&gt;entripoint" vertex="1">
+        <mxCell id="QVwQwyUG0Fi7LHdL0sS_-4" parent="QVwQwyUG0Fi7LHdL0sS_-27" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="socket&lt;br&gt;entripoint" vertex="1">
           <mxGeometry height="80" width="80" x="454" y="380" as="geometry" />
         </mxCell>
         <mxCell id="QVwQwyUG0Fi7LHdL0sS_-10" edge="1" parent="QVwQwyUG0Fi7LHdL0sS_-27" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontColor=#009900;curved=1;entryX=0.079;entryY=0.201;entryDx=0;entryDy=0;entryPerimeter=0;" target="QVwQwyUG0Fi7LHdL0sS_-6" value="подьем WS при помоши&amp;nbsp;&lt;br&gt;ВПубНТ и отправка сообшений&amp;nbsp;&lt;br&gt;шифруемых ВПривНТ&lt;br&gt;отправка валидных&lt;br&gt;данных аунтентификации">

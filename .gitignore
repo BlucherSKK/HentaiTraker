@@ -1,4 +1,5 @@
 /target
 *.min.js
+*.min.html
 *.js.map
 *.kate-swp

@@ -19,8 +19,6 @@ use db::Store;
 use handle::registry::SessionRegistry;
 use hnts::HntsState;
 
-// ─── Content-Length passthrough для стримов ────────────────────────────────────
-
 pub struct StreamWithLength<R>(R, u64);
 
 impl<'r, R: Responder<'r, 'r>> Responder<'r, 'r> for StreamWithLength<R> {
@@ -31,8 +29,6 @@ impl<'r, R: Responder<'r, 'r>> Responder<'r, 'r> for StreamWithLength<R> {
     }
 }
 
-// ─── Статические маршруты ─────────────────────────────────────────────────────
-
 #[get("/")]
 fn index() -> RawHtml<&'static str> {
     RawHtml(include_str!("./loader.min.html"))
@@ -42,7 +38,7 @@ fn index() -> RawHtml<&'static str> {
 fn app_js() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
     let data  = include_str!("./app.min.js").as_bytes().to_vec();
     let total = data.len() as u64;
-    let delay = if cfg!(feature = "QA") { 100_000u64 } else { 0 };
+    let delay = if cfg!(feature = "QA") { 100_000u64 } else { 1000 };
     let stream = ReaderStream! {
         let mut off = 0usize;
         let len = data.len();
@@ -73,21 +69,16 @@ fn app_map() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
     StreamWithLength(stream, total)
 }
 
-// ─── REST API ─────────────────────────────────────────────────────────────────
-
-/// Последние 20 постов для /feeds. Доступно без аутентификации.
 #[get("/getfeed")]
 async fn get_feed(store: &State<Arc<Store>>) -> RawJson<String> {
     match store.get_latest_posts(20).await {
         Ok(posts) => RawJson(serde_json::to_string(&posts).unwrap_or_else(|_| "[]".into())),
         Err(e) => {
-            log::error!("get_feed: {e}");
+            error!("get_feed: {e}");
             RawJson("[]".into())
         }
     }
 }
-
-// ─── Запуск ───────────────────────────────────────────────────────────────────
 
 #[rocket::main]
 async fn main() {
@@ -100,23 +91,20 @@ async fn main() {
     let store = Arc::new(
         Store::init(&db_url, &redis_url)
         .await
-        .expect("Инициализация Store не удалась"),
+        .expect("Store init failed"),
     );
 
     let hnts = HntsState::new();
-    // Ротация ХНТС токена каждые 15 минут (старый ещё живёт одну ротацию)
     hnts.start_auto_refresh(Duration::from_secs(15 * 60));
 
-    let registry = SessionRegistry::new();
-
     rocket::build()
-    .manage(Arc::clone(&store))  // Arc<Store>       — REST + WS handlers
-    .manage(hnts)                // HntsState        — /api/hnts/*
-    .manage(registry)            // SessionRegistry  — трансляция сообщений
+    .manage(Arc::clone(&store))
+    .manage(hnts)
+    .manage(SessionRegistry::new())
     .mount("/",         routes![index, app_js, app_map])
     .mount("/api",      routes![get_feed])
     .mount("/api/hnts", routes![hnts::get_token, handle::socket::ws])
     .launch()
     .await
-    .expect("Rocket упал");
+    .expect("Rocket crashed");
 }

@@ -11,3 +11,16 @@ services:
       POSTGRES_DB: test_db
     ports:
       - "5432:5432"
+
+  redis:
+    image: redis:latest  # Используем легкую версию на базе Alpine
+    container_name: redis_app
+    restart: always
+    ports:
+      - "6379:6379"          # Пробрасываем порт (хост:контейнер)
+    volumes:
+      - redis_data:/data     # Сохраняем данные, чтобы они не удалились с контейнером
+    command: redis-server --save 60 1 --loglevel warning # Настройка автосохранения
+
+volumes:
+  redis_data:                # Создаем именованный том для данных

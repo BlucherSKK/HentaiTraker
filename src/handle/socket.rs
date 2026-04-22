@@ -14,7 +14,7 @@ use crate::hnts::HntsState;
 use crate::db::Store;
 use crate::secure;
 
-// ─── Снимок состояния (чтобы отпустить лок до дешифровки) ────────────────────
+// ─── Снимок состояния ────────────────────────────────────────────────────────
 
 enum StateCtx {
     Entrypoint,
@@ -32,7 +32,7 @@ fn state_ctx(sess: &Session) -> StateCtx {
     }
 }
 
-// ─── Хелперы ──────────────────────────────────────────────────────────────────
+// ─── Хелперы ─────────────────────────────────────────────────────────────────
 
 fn message_bytes(msg: Message) -> Option<Vec<u8>> {
     match msg {
@@ -96,7 +96,7 @@ pub fn ws(
         let (mut sink, mut source) = stream.split();
         let (tx, mut rx)           = mpsc::channel::<Message>(32);
 
-        // Задача-писатель: сериализует запись в сокет
+        // Задача-писатель: сериализует запись во внешний сокет
         tokio::spawn(async move {
             while let Some(msg) = rx.recv().await {
                 if sink.send(msg).await.is_err() { break; }
@@ -105,7 +105,7 @@ pub fn ws(
 
         let session = Arc::new(Mutex::new(Session::new(tx, pub_vtns)));
 
-        // Broadcast-канал: plain JSON → воркер шифрует → send_binary
+        // Broadcast-канал: plain JSON → воркер шифрует текущим ключом сессии
         let (bcast_tx, mut bcast_rx) = mpsc::channel::<Value>(64);
         {
             let mut s     = session.lock().await;
@@ -120,9 +120,16 @@ pub fn ws(
             }
         });
 
-        // Регистрируем обработчики аутентифицированных событий
+        // ── Регистрация обработчиков событий ──────────────────────────────────
         let reg = Arc::new(registry.clone());
         let mut router = EventRouter::new();
+        {
+            let r = Arc::clone(&reg);
+            router.on("chat_join", move |sess, data| {
+                let r = Arc::clone(&r);
+                async move { handlers::chat_join(sess, data, r).await }
+            });
+        }
         {
             let r = Arc::clone(&reg);
             router.on("message_create", move |sess, data| {
@@ -136,16 +143,9 @@ pub fn ws(
         router.on("chat_list", |sess, data| async move {
             handlers::chat_list(sess, data).await
         });
-        {
-            let r = Arc::clone(&reg);
-            router.on("chat_create", move |sess, data| {
-                let r = Arc::clone(&r);
-                async move { handlers::chat_create(sess, data, r).await }
-            });
-        }
         let router = Arc::new(router);
 
-        // ── Главный цикл сообщений ─────────────────────────────────────────────
+        // ── Главный цикл ──────────────────────────────────────────────────────
         while let Some(result) = source.next().await {
             let raw = match result { Ok(m) => m, Err(_) => break };
             let raw = match message_bytes(raw) { Some(b) => b, None => continue };
@@ -168,9 +168,7 @@ pub fn ws(
                     let Ok(val) = serde_json::from_slice::<Value>(&plain) else { continue };
                     if val["event"].as_str() != Some("auth") { continue; }
 
-                    let pub_v  = val["pub_vtns"].as_str().map(str::to_string);
-                    let priv_v = val["priv_vtns"].as_str().map(str::to_string);
-                    match (pub_v, priv_v) {
+                    match (val["pub_vtns"].as_str(), val["priv_vtns"].as_str()) {
                         (Some(pv), Some(pvt)) => {
                             let mut s = session.lock().await;
                             if pv != s.pub_vtns {
@@ -178,7 +176,9 @@ pub fn ws(
                                 continue;
                             }
                             s.state = SessionState::LongToken {
-                                public_vtns: pv, private_vtns: pvt, issued_at: Instant::now(),
+                                public_vtns:  pv.to_string(),
+                                    private_vtns: pvt.to_string(),
+                                        issued_at:    Instant::now(),
                             };
                             let _ = s.send_json(&json!({ "event": "auth_ok" })).await;
                         }
@@ -186,7 +186,7 @@ pub fn ws(
                     }
                 }
 
-                // ── LongToken (ожидаем login) ──────────────────────────────────
+                // ── LongToken ──────────────────────────────────────────────────
                 StateCtx::LongToken(priv_vtns) => {
                     let Some((event, payload)) = decrypt_and_parse(&priv_vtns, &raw) else {
                         let s = session.lock().await;
@@ -206,7 +206,6 @@ pub fn ws(
                         )
                     };
 
-                    // Проверяем учётные данные (без лока)
                     let login_result = async {
                         let user = store.get_user_by_name(&username).await
                         .map_err(|_| "db_error")?
@@ -224,7 +223,7 @@ pub fn ws(
 
                             // Подписываем сессию на все чаты пользователя
                             if let (Some(tx), Ok(chats)) =
-                                (bcast_tx, store.get_user_chats(user.id).await)
+                                (&bcast_tx, store.get_user_chats(user.id).await)
                                 {
                                     for chat in chats {
                                         registry.join(chat.id, SessionEntry {
@@ -236,9 +235,7 @@ pub fn ws(
                                 }
 
                                 let enc = secure::encrypt(&priv_vtns, json!({
-                                    "event":   "login_ok",
-                                    "pub_at":  pub_at,
-                                    "priv_at": priv_at,
+                                    "event": "login_ok", "pub_at": pub_at, "priv_at": priv_at,
                                 }).to_string().as_bytes());
 
                                 let mut s = session.lock().await;
@@ -295,11 +292,8 @@ pub fn ws(
             }
         }
 
-        // Отписываем сессию от всех чатов при отключении
-        {
-            let s = session.lock().await;
-            registry.leave(&s.id).await;
-        }
+        // Отписываемся от всех чатов при отключении
+        { registry.leave(&session.lock().await.id).await; }
 
         Ok(())
     }))
