@@ -7,12 +7,14 @@ edition = "2024"
 argon2 = { version = "0.5.3", features = ["password-hash"] }
 base64 = "0.22.1"
 chrono = { version = "0.4.44", features = ["serde"] }
+deadpool-redis = { version = "0.23.0", features = ["rt_tokio_1"] }
 dotenvy = "0.15.7"
 env_logger = "0.11.10"
 hex = "0.4.3"
 password-hash = "0.6.1"
 rand = "0.10.1"
 rocket = { version = "0.5.1", features = ["json"] }
+rocket_ws = "0.1.1"
 serde = "1.0.228"
 serde_json = "1.0.149"
 sqlx = { version = "0.8.6", features = ["chrono", "postgres", "runtime-tokio"] }
