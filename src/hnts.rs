@@ -11,10 +11,10 @@ pub struct TokenResponse {
     token: String,
 }
 
+#[derive(Clone)]
 pub struct HntsState {
     tokens: Arc<RwLock<TokenPair>>,
 }
-
 
 struct TokenPair {
     current: String,
@@ -41,7 +41,6 @@ impl HntsState {
         }
     }
 
-    /// @param period - интервал между ротациями токенов (например, Duration::from_secs(600))
     pub fn start_auto_refresh(&self, period: Duration) {
         let state = Arc::clone(&self.tokens);
         tokio::spawn(async move {
@@ -54,16 +53,20 @@ impl HntsState {
         });
     }
 
-    /// Возвращает true, если токен совпадает с текущим или предыдущим ВТНС.
-    /// @param token - строка токена, полученная от клиента на точке входа сессии
     pub async fn is_valid(&self, token: &str) -> bool {
         let pair = self.tokens.read().await;
         pair.current == token || pair.previous.as_deref() == Some(token)
     }
+
+    /// Дешифрует данные текущим ВТНС, при неудаче — предыдущим.
+    /// Возвращает None если ни один ключ не подошёл.
+    pub async fn try_decrypt(&self, data: &[u8]) -> Option<Vec<u8>> {
+        let pair = self.tokens.read().await;
+        secure::decrypt(&pair.current, data)
+        .or_else(|| pair.previous.as_deref().and_then(|prev| secure::decrypt(prev, data)))
+    }
 }
 
-/// Возвращает текущий ВТНС в виде JSON для встраивания в лоадер или прямого запроса клиентом.
-/// Route: GET /api/hnts/gettoken
 #[get("/gettoken")]
 pub async fn get_token(state: &State<HntsState>) -> Json<TokenResponse> {
     let pair = state.tokens.read().await;
