@@ -1,4 +1,5 @@
 import { STYLES } from "./assets";
+import { AuthPage } from "./auth";
 import { Chats } from "./chats";
 import { HntDataBase, init_test_db } from "./db";
 import { get_header, get_nonlogin_dm_noty } from "./header";
@@ -6,7 +7,6 @@ import { Feed, HomeNav } from "./home";
 import { AppNav } from "./nav";
 import { HntWsConnection } from "./ws";
 
-// Данные, которые лоадер пробрасывает в приложение через window
 declare global {
     interface Window {
         __VTNS__?: {
@@ -29,7 +29,7 @@ export interface User {
     tagpool: Tags[];
 }
 
-type PageType = 'feeds' | 'projects' | 'settings' | 'login' | 'dm' | 'chats';
+type PageType = 'feeds' | 'projects' | 'settings' | 'login' | 'dm' | 'chats' | 'profile';
 
 interface AppState {
     page: PageType;
@@ -45,6 +45,7 @@ customElements.define('app-feed',  Feed);
 customElements.define('home-nav',  HomeNav);
 customElements.define('app-nav',   AppNav);
 customElements.define('app-chats', Chats);
+customElements.define('app-auth',  AuthPage);
 
 const App = {
     state: {
@@ -77,10 +78,21 @@ const App = {
         const ws = this.state.ws;
         if (!ws) return;
 
-        ws.on('login_ok', (_ev, payload) => {
-            console.log('[WS] Аутентификация успешна', payload);
-            // TODO: установить this.state.user и вызвать this.render()
-        });
+        const onAuthSuccess = (_ev: string, payload: Record<string, unknown>) => {
+            this.state.user = {
+                name:    payload.username as string,
+                id:      String(payload.user_id),
+                token:   payload.pub_at   as string,
+                tagpool: [],
+            };
+            this.state.page = this.state.lastpage === 'login' ? 'feeds' : this.state.lastpage;
+            this.state.init = false;
+            history.replaceState({ page: this.state.page }, '', `/#${this.state.page}`);
+            this.render();
+        };
+
+        ws.on('login_ok',    onAuthSuccess);
+        ws.on('register_ok', onAuthSuccess);
 
         ws.on('error', (_ev, payload) => {
             console.error('[WS] Ошибка сервера:', payload);
@@ -115,6 +127,13 @@ const App = {
                 chatsElem.render();
             }
         }
+
+        if (this.state.page === 'login') {
+            const authElem = root.querySelector('app-auth') as AuthPage;
+            if (authElem) {
+                authElem.ws = this.state.ws;
+            }
+        }
     },
 
     getContentByPage(): string {
@@ -123,6 +142,7 @@ const App = {
             case 'feeds':  return `${nav}<app-feed></app-feed>`;
             case 'dm':     return `${nav}${this.state.user ? "" : get_nonlogin_dm_noty()}`;
             case 'chats':  return `${nav}<app-chats />`;
+            case 'login':  return `<app-auth></app-auth>`;
             default:       return nav;
         }
     },

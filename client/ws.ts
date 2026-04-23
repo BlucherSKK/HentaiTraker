@@ -13,15 +13,6 @@ type WsState =
 
 type EventHandler = (event: string, payload: Record<string, unknown>) => void;
 
-/**
- * Клиентский менеджер WebSocket-соединения.
- *
- * Принимает уже открытый сокет, прошедший ВТНС-рукопожатие в лоадере
- * (сервер в состоянии LongToken, клиент — тоже).
- *
- * Жизненный цикл:
- *   LongToken → (login) → Authenticated → (реавторизация) → ...
- */
 export class HntWsConnection {
     private ws: WebSocket;
     private state: WsState;
@@ -36,11 +27,24 @@ export class HntWsConnection {
         this.ws.addEventListener('close',   () => { this.state = { kind: 'closed' }; });
     }
 
-    // ── Подписка на события ───────────────────────────────────────────────────
-
     on(event: string, handler: EventHandler): this {
         if (!this.handlers.has(event)) this.handlers.set(event, []);
         this.handlers.get(event)!.push(handler);
+        return this;
+    }
+
+    once(event: string, handler: EventHandler): () => void {
+        const wrapper: EventHandler = (ev, payload) => {
+            this.off(event, wrapper);
+            handler(ev, payload);
+        };
+        this.on(event, wrapper);
+        return () => this.off(event, wrapper);
+    }
+
+    off(event: string, handler: EventHandler): this {
+        const list = this.handlers.get(event);
+        if (list) this.handlers.set(event, list.filter(h => h !== handler));
         return this;
     }
 
@@ -48,8 +52,6 @@ export class HntWsConnection {
         this.handlers.get(event)?.forEach(h => h(event, payload));
         this.handlers.get('*')?.forEach(h => h(event, payload));
     }
-
-    // ── Входящие сообщения ────────────────────────────────────────────────────
 
     private async onMessage(e: MessageEvent) {
         if (!(e.data instanceof ArrayBuffer)) {
@@ -79,13 +81,13 @@ export class HntWsConnection {
             if (!obj) return;
             const event = obj.event as string;
 
-            if (event === 'login_ok') {
+            if (event === 'login_ok' || event === 'register_ok') {
                 this.state = {
                     kind:    'authenticated',
                     pub_at:  obj.pub_at  as string,
                     priv_at: obj.priv_at as string,
                 };
-                this.emit('login_ok', obj);
+                this.emit(event, obj);
             } else if (event === 'token_refresh') {
                 this.state = {
                     kind:      'long_token',
@@ -123,23 +125,24 @@ export class HntWsConnection {
         }
     }
 
-    // ── Исходящие сообщения ───────────────────────────────────────────────────
-
-    /** Отправляет запрос логина (LongToken → Authenticated) */
     async login(username: string, password: string): Promise<void> {
         if (this.state.kind !== 'long_token') throw new Error('WS not in long_token state');
         const enc = await encryptJson(this.state.priv_vtns, { event: 'login', username, password });
         this.ws.send(enc);
     }
 
-    /** Отправляет произвольное зашифрованное событие (только в Authenticated) */
+    async register(username: string, password: string): Promise<void> {
+        if (this.state.kind !== 'long_token') throw new Error('WS not in long_token state');
+        const enc = await encryptJson(this.state.priv_vtns, { event: 'register', username, password });
+        this.ws.send(enc);
+    }
+
     async send(event: string, payload: Record<string, unknown> = {}): Promise<void> {
         if (this.state.kind !== 'authenticated') throw new Error('WS not authenticated');
         const enc = await encryptJson(this.state.priv_at, { event, ...payload });
         this.ws.send(enc);
     }
 
-    /** Инициирует реавторизацию через хеш priv_at (PrivateOnly) */
     private async doReauth(): Promise<void> {
         if (this.state.kind !== 'authenticated' && this.state.kind !== 'private_only') return;
         const priv_at = (this.state as { priv_at: string }).priv_at;
@@ -147,8 +150,6 @@ export class HntWsConnection {
         this.state    = { kind: 'private_only', priv_at };
         this.ws.send(JSON.stringify({ event: 'reauth', hash }));
     }
-
-    // ── Утилиты ───────────────────────────────────────────────────────────────
 
     get isAuthenticated(): boolean { return this.state.kind === 'authenticated'; }
     get isConnected():     boolean { return this.ws.readyState === WebSocket.OPEN; }

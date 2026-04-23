@@ -38,7 +38,7 @@ fn index() -> RawHtml<&'static str> {
 fn app_js() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
     let data  = include_str!("./app.min.js").as_bytes().to_vec();
     let total = data.len() as u64;
-    let delay = if cfg!(feature = "QA") { 100_000u64 } else { 1000 };
+    let delay = if cfg!(feature = "QA") { 100_000u64 } else { 0 };
     let stream = ReaderStream! {
         let mut off = 0usize;
         let len = data.len();

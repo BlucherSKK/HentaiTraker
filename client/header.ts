@@ -14,7 +14,7 @@ export function get_header(page: string, user?: User): string {
         ? `
         <div class="user-container">
         <span>${user.name}</span>
-        <a href="/profile">Профиль</a>
+        <a data-link="profile">Профиль</a>
         </div>
         `
         : `

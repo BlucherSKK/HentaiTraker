@@ -319,3 +319,113 @@ h1 { color: var(--textc); border-bottom: 2px solid var(--bgc); padding-bottom: 1
 .menu a { color: var(--textc); text-decoration: none; font-weight: bold; }
 .btn-back { margin-top: 20px; padding: 10px 20px; background: var(--bgc); color: var(--textc); border: none; cursor: pointer; border-radius: 5px; }
 li { margin: 10px 0; font-size: 1.1em; }
+
+
+/* ── Auth page ── */
+
+.auth-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 70vh;
+    padding: 2em;
+}
+
+.auth-card {
+    background: var(--alt-bg);
+    border: 2px solid var(--border);
+    border-radius: 1em;
+    width: 100%;
+    max-width: 420px;
+    overflow: hidden;
+}
+
+.auth-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--border);
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 0.85em 1em;
+    font-size: 0.95em;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--ltextc);
+    transition: background 0.2s, color 0.2s;
+}
+
+.auth-tab:hover {
+    background: var(--bg-nav-hover);
+    color: var(--textc);
+}
+
+.auth-tab--active {
+    background: var(--bg-nav);
+    color: white;
+    font-weight: bold;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+    padding: 1.8em;
+}
+
+.auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35em;
+}
+
+.auth-label {
+    font-size: 0.85em;
+    color: var(--ltextc);
+}
+
+.auth-input {
+    padding: 0.65em 0.9em;
+    border: 1px solid var(--border);
+    border-radius: 0.5em;
+    background: var(--bgc);
+    color: var(--textc);
+    font-size: 1em;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.auth-input:focus {
+    border-color: var(--accentc);
+}
+
+.auth-error {
+    color: #e05050;
+    font-size: 0.88em;
+    padding: 0.5em 0.75em;
+    background: rgba(224, 80, 80, 0.12);
+    border-radius: 0.4em;
+}
+
+.auth-submit {
+    margin-top: 0.4em;
+    padding: 0.75em;
+    border: none;
+    border-radius: 0.5em;
+    background: var(--accentc);
+    color: white;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.auth-submit:hover:not(:disabled) {
+    opacity: 0.85;
+}
+
+.auth-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

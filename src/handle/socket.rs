@@ -14,8 +14,6 @@ use crate::hnts::HntsState;
 use crate::db::Store;
 use crate::secure;
 
-// ─── Снимок состояния ────────────────────────────────────────────────────────
-
 enum StateCtx {
     Entrypoint,
     LongToken(String),
@@ -31,8 +29,6 @@ fn state_ctx(sess: &Session) -> StateCtx {
         SessionState::PrivateOnly(p)                    => StateCtx::PrivateOnly(p.clone()),
     }
 }
-
-// ─── Хелперы ─────────────────────────────────────────────────────────────────
 
 fn message_bytes(msg: Message) -> Option<Vec<u8>> {
     match msg {
@@ -78,8 +74,6 @@ async fn handle_token_refresh(sess: &mut Session) {
     }
 }
 
-// ─── WebSocket route ──────────────────────────────────────────────────────────
-
 #[get("/ws/<pub_vtns>")]
 pub fn ws(
     ws:       WebSocket,
@@ -96,7 +90,6 @@ pub fn ws(
         let (mut sink, mut source) = stream.split();
         let (tx, mut rx)           = mpsc::channel::<Message>(32);
 
-        // Задача-писатель: сериализует запись во внешний сокет
         tokio::spawn(async move {
             while let Some(msg) = rx.recv().await {
                 if sink.send(msg).await.is_err() { break; }
@@ -105,10 +98,9 @@ pub fn ws(
 
         let session = Arc::new(Mutex::new(Session::new(tx, pub_vtns)));
 
-        // Broadcast-канал: plain JSON → воркер шифрует текущим ключом сессии
         let (bcast_tx, mut bcast_rx) = mpsc::channel::<Value>(64);
         {
-            let mut s     = session.lock().await;
+            let mut s      = session.lock().await;
             s.store        = Some(Arc::clone(&store));
             s.broadcast_tx = Some(bcast_tx);
         }
@@ -120,7 +112,6 @@ pub fn ws(
             }
         });
 
-        // ── Регистрация обработчиков событий ──────────────────────────────────
         let reg = Arc::new(registry.clone());
         let mut router = EventRouter::new();
         {
@@ -145,7 +136,6 @@ pub fn ws(
         });
         let router = Arc::new(router);
 
-        // ── Главный цикл ──────────────────────────────────────────────────────
         while let Some(result) = source.next().await {
             let raw = match result { Ok(m) => m, Err(_) => break };
             let raw = match message_bytes(raw) { Some(b) => b, None => continue };
@@ -158,7 +148,6 @@ pub fn ws(
             };
 
             match ctx {
-                // ── Entrypoint ─────────────────────────────────────────────────
                 StateCtx::Entrypoint => {
                     let Some(plain) = hnts.try_decrypt(&raw).await else {
                         let s = session.lock().await;
@@ -186,73 +175,131 @@ pub fn ws(
                     }
                 }
 
-                // ── LongToken ──────────────────────────────────────────────────
                 StateCtx::LongToken(priv_vtns) => {
                     let Some((event, payload)) = decrypt_and_parse(&priv_vtns, &raw) else {
                         let s = session.lock().await;
                         let _ = s.send_json(&json!({ "event": "error", "code": "decrypt_failed" })).await;
                         continue;
                     };
-                    if event != "login" { continue; }
 
-                    // Извлекаем данные без удержания лока во время DB-запроса
-                    let (username, password, session_id, bcast_tx) = {
-                        let s = session.lock().await;
-                        (
-                            payload["username"].as_str().unwrap_or("").to_string(),
-                         payload["password"].as_str().unwrap_or("").to_string(),
-                         s.id.clone(),
-                         s.broadcast_tx.clone(),
-                        )
-                    };
+                    match event.as_str() {
+                        "login" => {
+                            let (username, password, session_id, bcast_tx) = {
+                                let s = session.lock().await;
+                                (
+                                    payload["username"].as_str().unwrap_or("").to_string(),
+                                 payload["password"].as_str().unwrap_or("").to_string(),
+                                 s.id.clone(),
+                                 s.broadcast_tx.clone(),
+                                )
+                            };
 
-                    let login_result = async {
-                        let user = store.get_user_by_name(&username).await
-                        .map_err(|_| "db_error")?
-                        .ok_or("user_not_found")?;
-                        if !secure::verify_password(&password, &user.pass) {
-                            return Err("wrong_password");
-                        }
-                        Ok(user)
-                    }.await;
-
-                    match login_result {
-                        Ok(user) => {
-                            let pub_at  = secure::get_token(16);
-                            let priv_at = secure::get_token(32);
-
-                            // Подписываем сессию на все чаты пользователя
-                            if let (Some(tx), Ok(chats)) =
-                                (&bcast_tx, store.get_user_chats(user.id).await)
-                                {
-                                    for chat in chats {
-                                        registry.join(chat.id, SessionEntry {
-                                            session_id:   session_id.clone(),
-                                                      user_id:      user.id,
-                                                      broadcast_tx: tx.clone(),
-                                        }).await;
-                                    }
+                            let login_result = async {
+                                let user = store.get_user_by_name(&username).await
+                                .map_err(|_| "db_error")?
+                                .ok_or("user_not_found")?;
+                                if !secure::verify_password(&password, &user.pass) {
+                                    return Err("wrong_password");
                                 }
+                                Ok(user)
+                            }.await;
 
-                                let enc = secure::encrypt(&priv_vtns, json!({
-                                    "event": "login_ok", "pub_at": pub_at, "priv_at": priv_at,
-                                }).to_string().as_bytes());
+                            match login_result {
+                                Ok(user) => {
+                                    let pub_at  = secure::get_token(16);
+                                    let priv_at = secure::get_token(32);
 
-                                let mut s = session.lock().await;
-                                let _ = s.send_binary(enc).await;
-                                s.user_id = Some(user.id);
-                                s.state   = SessionState::Authenticated {
-                                    pub_at, priv_at, issued_at: Instant::now(),
-                                };
+                                    if let (Some(tx), Ok(chats)) =
+                                        (&bcast_tx, store.get_user_chats(user.id).await)
+                                        {
+                                            for chat in chats {
+                                                registry.join(chat.id, SessionEntry {
+                                                    session_id:   session_id.clone(),
+                                                              user_id:      user.id,
+                                                              broadcast_tx: tx.clone(),
+                                                }).await;
+                                            }
+                                        }
+
+                                        let enc = secure::encrypt(&priv_vtns, json!({
+                                            "event":    "login_ok",
+                                            "pub_at":   pub_at,
+                                            "priv_at":  priv_at,
+                                            "user_id":  user.id,
+                                            "username": user.name,
+                                        }).to_string().as_bytes());
+
+                                        let mut s = session.lock().await;
+                                        let _ = s.send_binary(enc).await;
+                                        s.user_id = Some(user.id);
+                                        s.state   = SessionState::Authenticated {
+                                            pub_at, priv_at, issued_at: Instant::now(),
+                                        };
+                                }
+                                Err(code) => {
+                                    let s = session.lock().await;
+                                    let _ = s.send_json(&json!({ "event": "login_failed", "code": code })).await;
+                                }
+                            }
                         }
-                        Err(code) => {
-                            let s = session.lock().await;
-                            let _ = s.send_json(&json!({ "event": "login_failed", "code": code })).await;
+
+                        "register" => {
+                            let (username, password) = (
+                                payload["username"].as_str().unwrap_or("").to_string(),
+                                                        payload["password"].as_str().unwrap_or("").to_string(),
+                            );
+
+                            let register_result = async {
+                                if username.len() < 3 || username.len() > 32 {
+                                    return Err("invalid_username");
+                                }
+                                if password.len() < 6 {
+                                    return Err("password_too_short");
+                                }
+                                if store.get_user_by_name(&username).await
+                                    .map_err(|_| "db_error")?
+                                    .is_some()
+                                    {
+                                        return Err("username_taken");
+                                    }
+                                    let hashed = secure::hash_password(&password)
+                                    .map_err(|_| "hash_error")?;
+                                store.set_user(&username, &hashed, "user")
+                                .await
+                                .map_err(|_| "db_error")
+                            }.await;
+
+                            match register_result {
+                                Ok(user) => {
+                                    let pub_at  = secure::get_token(16);
+                                    let priv_at = secure::get_token(32);
+
+                                    let enc = secure::encrypt(&priv_vtns, json!({
+                                        "event":    "register_ok",
+                                        "pub_at":   pub_at,
+                                        "priv_at":  priv_at,
+                                        "user_id":  user.id,
+                                        "username": user.name,
+                                    }).to_string().as_bytes());
+
+                                    let mut s = session.lock().await;
+                                    let _ = s.send_binary(enc).await;
+                                    s.user_id = Some(user.id);
+                                    s.state   = SessionState::Authenticated {
+                                        pub_at, priv_at, issued_at: Instant::now(),
+                                    };
+                                }
+                                Err(code) => {
+                                    let s = session.lock().await;
+                                    let _ = s.send_json(&json!({ "event": "register_failed", "code": code })).await;
+                                }
+                            }
                         }
+
+                        _ => {}
                     }
                 }
 
-                // ── Authenticated ──────────────────────────────────────────────
                 StateCtx::Authenticated(priv_at) => {
                     match decrypt_and_parse(&priv_at, &raw) {
                         Some((event, payload)) => {
@@ -266,7 +313,6 @@ pub fn ws(
                     }
                 }
 
-                // ── PrivateOnly ────────────────────────────────────────────────
                 StateCtx::PrivateOnly(priv_at) => {
                     let expected = secure::token_hash(&priv_at);
                     let Ok(incoming) = serde_json::from_slice::<Value>(&raw) else { continue };
@@ -292,7 +338,6 @@ pub fn ws(
             }
         }
 
-        // Отписываемся от всех чатов при отключении
         { registry.leave(&session.lock().await.id).await; }
 
         Ok(())
