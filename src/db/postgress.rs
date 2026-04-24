@@ -44,6 +44,32 @@ impl Database {
         .await
     }
 
+    pub async fn update_user(
+        &self,
+        target_id:   i32,
+        modifier_id: i32,
+        name:        Option<&str>,
+        pass:        Option<&str>,
+        avatar:      Option<&str>,
+        tags:        Option<&str>,
+        roles:       Option<&str>,
+    ) -> Result<Option<User>, sqlx::Error> {
+        sqlx::query_as::<_, User>(
+            "SELECT * FROM db_update_user($1, $2, $3, $4, $5, $6, $7)"
+        )
+        .bind(target_id)
+        .bind(modifier_id)
+        .bind(name)
+        .bind(pass)
+        .bind(avatar)
+        .bind(tags)
+        .bind(roles)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+
+
     // ── Posts ─────────────────────────────────────────────────────────────────
 
     pub async fn get_posts_by_author(&self, author_id: i32, limit: i64) -> Result<Vec<Post>, sqlx::Error> {
@@ -121,9 +147,9 @@ impl Database {
 
     // ── Messages ──────────────────────────────────────────────────────────────
 
-    pub async fn send_message(&self, chat_id: i32, author_id: i32, content: &str) -> Result<Message, sqlx::Error> {
-        sqlx::query_as::<_, Message>("SELECT * FROM db_send_message($1, $2, $3)")
-        .bind(chat_id).bind(author_id).bind(content)
+    pub async fn send_message(&self, chat_id: i32, author_id: i32, content: &str, files: Option<&str>) -> Result<Message, sqlx::Error> {
+        sqlx::query_as::<_, Message>("SELECT * FROM db_send_message($1, $2, $3, $4)")
+        .bind(chat_id).bind(author_id).bind(content).bind(files)
         .fetch_one(&self.pool)
         .await
     }

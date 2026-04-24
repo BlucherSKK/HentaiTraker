@@ -6,6 +6,7 @@ import { get_header, get_nonlogin_dm_noty } from "./header";
 import { Feed, HomeNav } from "./home";
 import { AppNav } from "./nav";
 import { HntWsConnection } from "./ws";
+import { ProfilePage } from "./profile";
 
 declare global {
     interface Window {
@@ -46,6 +47,7 @@ customElements.define('home-nav',  HomeNav);
 customElements.define('app-nav',   AppNav);
 customElements.define('app-chats', Chats);
 customElements.define('app-auth',  AuthPage);
+customElements.define('app-profile', ProfilePage);
 
 const App = {
     state: {
@@ -128,6 +130,15 @@ const App = {
             }
         }
 
+        if (this.state.page === 'profile') {
+            const profileElem = root.querySelector('app-profile') as ProfilePage;
+            if (profileElem) {
+                profileElem.user = this.state.user;
+                profileElem.ws   = this.state.ws;
+            }
+        }
+
+
         if (this.state.page === 'login') {
             const authElem = root.querySelector('app-auth') as AuthPage;
             if (authElem) {
@@ -143,6 +154,7 @@ const App = {
             case 'dm':     return `${nav}${this.state.user ? "" : get_nonlogin_dm_noty()}`;
             case 'chats':  return `${nav}<app-chats />`;
             case 'login':  return `<app-auth></app-auth>`;
+            case 'profile': return `${nav}<app-profile></app-profile>`;
             default:       return nav;
         }
     },

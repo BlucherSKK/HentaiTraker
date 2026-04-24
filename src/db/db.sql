@@ -117,6 +117,52 @@ BEGIN
 END;
 $$;
 
+-- ── Profile ──────────────────────────────────────────────────
+
+-- Обновление пользователя.
+-- Если modifier == target — можно менять всё кроме roles.
+-- Если нет — modifier должен иметь роль 'admin'.
+-- Возвращает обновлённую запись или пустой результат при отказе.
+CREATE OR REPLACE FUNCTION db_update_user(
+    p_target_id   INT,
+    p_modifier_id INT,
+    p_name        TEXT,
+    p_pass        TEXT,
+    p_avatar      TEXT,
+    p_tags        TEXT,
+    p_roles       TEXT
+) RETURNS SETOF users LANGUAGE plpgsql AS $$
+DECLARE
+    v_mod_roles TEXT;
+BEGIN
+    IF p_target_id = p_modifier_id THEN
+        RETURN QUERY
+            UPDATE users SET
+                name   = COALESCE(p_name,   name),
+                pass   = COALESCE(p_pass,   pass),
+                avatar = COALESCE(p_avatar, avatar),
+                tags   = COALESCE(p_tags,   tags)
+            WHERE id = p_target_id
+            RETURNING *;
+    ELSE
+        SELECT roles INTO v_mod_roles FROM users WHERE id = p_modifier_id;
+        IF v_mod_roles IS NOT NULL AND v_mod_roles LIKE '%admin%' THEN
+            RETURN QUERY
+                UPDATE users SET
+                    name   = COALESCE(p_name,   name),
+                    pass   = COALESCE(p_pass,   pass),
+                    avatar = COALESCE(p_avatar, avatar),
+                    tags   = COALESCE(p_tags,   tags),
+                    roles  = COALESCE(p_roles,  roles)
+                WHERE id = p_target_id
+                RETURNING *;
+        END IF;
+    END IF;
+END;
+$$;
+
+
+
 -- ── Posts ────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION db_get_posts_by_author(p_author_id INT, p_limit INT)
@@ -185,12 +231,12 @@ $$;
 
 -- ── Messages ─────────────────────────────────────────────────
 
-CREATE OR REPLACE FUNCTION db_send_message(p_chat_id INT, p_author_id INT, p_content TEXT)
+CREATE OR REPLACE FUNCTION db_send_message(p_chat_id INT, p_author_id INT, p_content TEXT, p_files TEXT)
 RETURNS SETOF msg LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
-        INSERT INTO msg (content, author_id, chat_id, time)
-        VALUES (p_content, p_author_id, p_chat_id, NOW())
+        INSERT INTO msg (content, files, author_id, chat_id, time)
+        VALUES (p_content, p_files, p_author_id, p_chat_id, NOW())
         RETURNING *;
 END;
 $$;

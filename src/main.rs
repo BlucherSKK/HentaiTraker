@@ -15,6 +15,9 @@ mod handle;
 mod hnts;
 mod secure;
 
+mod upload;
+use upload::UploadTokenStore;
+
 use db::Store;
 use handle::registry::SessionRegistry;
 use hnts::HntsState;
@@ -85,6 +88,10 @@ async fn main() {
     dotenvy::dotenv().ok();
     env_logger::init();
 
+    tokio::fs::create_dir_all(upload::UPLOADS_DIR)
+    .await
+    .expect("cannot create uploads dir");
+
     let db_url    = std::env::var("DATABASE_URL").expect("DATABASE_URL не задан");
     let redis_url = std::env::var("REDIS_URL").expect("REDIS_URL не задан");
 
@@ -101,8 +108,9 @@ async fn main() {
     .manage(Arc::clone(&store))
     .manage(hnts)
     .manage(SessionRegistry::new())
+    .manage(UploadTokenStore::new())
     .mount("/",         routes![index, app_js, app_map])
-    .mount("/api",      routes![get_feed])
+    .mount("/api",      routes![get_feed, upload::upload, upload::serve_file])
     .mount("/api/hnts", routes![hnts::get_token, handle::socket::ws])
     .launch()
     .await

@@ -13,6 +13,7 @@ use super::handlers;
 use crate::hnts::HntsState;
 use crate::db::Store;
 use crate::secure;
+use crate::upload::UploadTokenStore;
 
 enum StateCtx {
     Entrypoint,
@@ -76,15 +77,17 @@ async fn handle_token_refresh(sess: &mut Session) {
 
 #[get("/ws/<pub_vtns>")]
 pub fn ws(
-    ws:       WebSocket,
-    pub_vtns: String,
-    hnts:     &State<HntsState>,
-    store:    &State<Arc<Store>>,
-    registry: &State<SessionRegistry>,
+    ws:           WebSocket,
+    pub_vtns:     String,
+    hnts:         &State<HntsState>,
+    store:        &State<Arc<Store>>,
+    registry:     &State<SessionRegistry>,
+    upload_store: &State<Arc<UploadTokenStore>>,
 ) -> Channel<'static> {
-    let hnts     = hnts.inner().clone();
-    let store    = Arc::clone(store.inner());
-    let registry = registry.inner().clone();
+    let hnts         = hnts.inner().clone();
+    let store        = Arc::clone(store.inner());
+    let registry     = registry.inner().clone();
+    let upload_store = Arc::clone(upload_store.inner());
 
     ws.channel(move |stream| Box::pin(async move {
         let (mut sink, mut source) = stream.split();
@@ -131,9 +134,24 @@ pub fn ws(
         router.on("message_list", |sess, data| async move {
             handlers::message_list(sess, data).await
         });
+        {
+            let us = Arc::clone(&upload_store);
+            router.on("get_upload_token", move |sess, data| {
+                let us = Arc::clone(&us);
+                async move { handlers::get_upload_token(sess, data, us).await }
+            });
+        }
         router.on("chat_list", |sess, data| async move {
             handlers::chat_list(sess, data).await
         });
+
+        router.on("profile_get", |sess, data| async move {
+            handlers::profile_get(sess, data).await
+        });
+        router.on("profile_update", |sess, data| async move {
+            handlers::profile_update(sess, data).await
+        });
+
         let router = Arc::new(router);
 
         while let Some(result) = source.next().await {
@@ -262,12 +280,15 @@ pub fn ws(
                                     {
                                         return Err("username_taken");
                                     }
-                                    let hashed = secure::hash_password(&password)
+                                let hashed = tokio::task::spawn_blocking(move || secure::hash_password(&password))
+                                    .await
+                                    .map_err(|_| "hash_error")?
                                     .map_err(|_| "hash_error")?;
+
                                 store.set_user(&username, &hashed, "user")
-                                .await
-                                .map_err(|_| "db_error")
-                            }.await;
+                                    .await
+                                    .map_err(|_| "db_error")
+                                }.await;
 
                             match register_result {
                                 Ok(user) => {

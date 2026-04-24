@@ -3,6 +3,8 @@ use tokio::sync::Mutex;
 use serde_json::{Value, json};
 use super::session::Session;
 use super::registry::{SessionRegistry, SessionEntry};
+use std::sync::Arc as StoreArc; // уже есть Arc, это для UploadTokenStore
+use crate::upload::UploadTokenStore;
 
 // ─── chat_join ────────────────────────────────────────────────────────────────
 
@@ -97,6 +99,107 @@ pub async fn chat_join(
     })).await;
 }
 
+
+// ─── profile_get ─────────────────────────────────────────────────────────────
+
+/// Получение профиля пользователя.
+///
+/// Payload:  `{ user_id?: i32 }` (по умолчанию — свой профиль)
+/// Ответ OK: `{ event: "profile_ok", id, name, avatar, tags, roles }`
+pub async fn profile_get(session: Arc<Mutex<Session>>, data: Value) {
+    let (store, user_id) = {
+        let s = session.lock().await;
+        (s.store.clone(), s.user_id)
+    };
+    let store = match store { Some(s) => s, None => return };
+    let requester_id = match user_id {
+        Some(id) => id,
+        None => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "unauthenticated" })).await;
+            return;
+        }
+    };
+
+    let target_id = data["user_id"].as_i64().map(|id| id as i32).unwrap_or(requester_id);
+
+    match store.get_user(target_id).await {
+        Ok(Some(user)) => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({
+                "event":  "profile_ok",
+                "id":     user.id,
+                "name":   user.name,
+                "avatar": user.avatar,
+                "tags":   user.tags,
+                "roles":  user.roles,
+            })).await;
+        }
+        Ok(None) => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "user_not_found" })).await;
+        }
+        Err(e) => {
+            error!("profile_get: {e}");
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+        }
+    }
+}
+
+// ─── profile_update ──────────────────────────────────────────────────────────
+
+/// Обновление профиля пользователя.
+///
+/// Payload:  `{ user_id?: i32, name?: string, avatar?: string, tags?: string, roles?: string }`
+/// Ответ OK: `{ event: "profile_updated", id, name, avatar, tags, roles }`
+/// Ошибки:   `{ event: "error", code: "unauthorized" | "user_not_found" | "db_error" }`
+pub async fn profile_update(session: Arc<Mutex<Session>>, data: Value) {
+    let (store, user_id) = {
+        let s = session.lock().await;
+        (s.store.clone(), s.user_id)
+    };
+    let store = match store { Some(s) => s, None => return };
+    let modifier_id = match user_id {
+        Some(id) => id,
+        None => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "unauthenticated" })).await;
+            return;
+        }
+    };
+
+    let target_id = data["user_id"].as_i64().map(|id| id as i32).unwrap_or(modifier_id);
+    let name   = data["name"].as_str();
+    let avatar = data["avatar"].as_str();
+    let tags   = data["tags"].as_str();
+    let roles  = data["roles"].as_str();
+
+    match store.update_user(target_id, modifier_id, name, None, avatar, tags, roles).await {
+        Ok(Some(user)) => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({
+                "event":  "profile_updated",
+                "id":     user.id,
+                "name":   user.name,
+                "avatar": user.avatar,
+                "tags":   user.tags,
+                "roles":  user.roles,
+            })).await;
+        }
+        Ok(None) => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "unauthorized" })).await;
+        }
+        Err(e) => {
+            error!("profile_update: {e}");
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+        }
+    }
+}
+
+
 // ─── chat_list ───────────────────────────────────────────────────────────────
 
 /// Payload: `{}`
@@ -139,7 +242,11 @@ pub async fn message_create(
     let content = data["content"].as_str().unwrap_or("").trim().to_string();
     if content.is_empty() { return; }
 
-    match store.send_message(chat_id, user_id, &content).await {
+    // files — JSON-массив URL строк: ["/api/files/xxx.jpg", ...]
+    let files = data["files"].as_array()
+    .map(|arr| serde_json::to_string(arr).unwrap_or_default());
+
+    match store.send_message(chat_id, user_id, &content, files.as_deref()).await {
         Ok(msg) => {
             let broadcast = json!({
                 "event":     "new_message",
@@ -147,6 +254,7 @@ pub async fn message_create(
                 "chat_id":   msg.chat_id,
                 "author_id": msg.author_id,
                 "content":   msg.content,
+                "files":     msg.files,   // теперь передаём клиентам
                 "time":      msg.time.to_string(),
             });
             registry.broadcast_to_chat(chat_id, broadcast.clone(), Some(&session_id)).await;
@@ -189,4 +297,24 @@ pub async fn message_list(session: Arc<Mutex<Session>>, data: Value) {
             s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
         }
     }
+}
+
+// ─── get_upload_token ─────────────────────────────────────────────────────────
+
+/// Payload: `{}`
+/// Ответ:   `{ event: "upload_token", token: "..." }` — одноразовый, TTL 5 минут
+pub async fn get_upload_token(
+    session:      Arc<Mutex<Session>>,
+    _data:        Value,
+    upload_store: Arc<UploadTokenStore>,
+) {
+    let user_id = {
+        let s = session.lock().await;
+        s.user_id
+    };
+    let user_id = match user_id { Some(id) => id, None => return };
+
+    let token = upload_store.create_token(user_id).await;
+    let s = session.lock().await;
+    s.send_encrypted(&json!({ "event": "upload_token", "token": token })).await;
 }
