@@ -143,10 +143,17 @@
 
 
 .loader {
-    height: 10%;
-    width: 10%;
-    margin: 0 45%;
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--alt-bg);
+    border-top-color: var(--accentc);
+    border-radius: 50%;
+    margin: 2em auto;
+    animation: spin 0.8s linear infinite;
+}
 
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 .hero-noty {

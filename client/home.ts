@@ -1,4 +1,4 @@
-import { LOGO, SVG_COMMENT, SVG_LIKE } from "./assets";
+import { SVG_COMMENT, SVG_LIKE } from "./assets";
 
 
 
@@ -42,7 +42,7 @@ export class Feed extends HTMLElement {
     render(content?: string) {
         this.innerHTML = `
         <div id="container" class="feed">
-        ${content ? content : '<div class="loader-wrapper"><img class="loader" src="https://i.gifer.com/ZKZg.gif" alt="Loading..."></div>'}
+        ${content ? content : '<div class="loader-wrapper"><div class="loader"></div></div>'}
         </div>
         `;
     }
@@ -54,9 +54,6 @@ export class Feed extends HTMLElement {
             const response = await fetch(url);
             const data = await response.json();
 
-            // Проверяем: если это объект с полем posts, берем его.
-            // Если это сам массив — используем его.
-            // Если ничего из этого — создаем пустой массив.
             const posts = Array.isArray(data)
             ? data
             : (data.posts && Array.isArray(data.posts) ? data.posts : []);
@@ -66,22 +63,35 @@ export class Feed extends HTMLElement {
                 return;
             }
 
-            const feedHtml = posts.map((post: any) => `
-            <div class="post-card">
-                <div class="post-text">
-                    <h2>${this.escapeHtml(post.title || 'Без названия')}</h2>
+            const feedHtml = posts.map((post: any) => {
+                let files: string[] = [];
+                try { files = JSON.parse(post.files || '[]'); } catch { /* ignore */ }
 
-                    <p class="post-text-body">${this.escapeHtml(post.text || '')}</p>
-                    <div class="post-info">
-                        <img src="${SVG_COMMENT}" alt="Комменты">
-                        <p>${this.escapeHtml(String(post.comment_count ?? '0'))}</p>
-                        <img src="${SVG_LIKE}" alt="Лайки">
-                        <p>${this.escapeHtml(String(post.like_count ?? '0'))}</p>
-                    </div>
+                const isImageUrl = (url: string) =>
+                url.startsWith('/api/files/') &&
+                /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(url);
+
+                const imagesHtml = files
+                .filter(isImageUrl)
+                .map(url => `<img src="${url}" alt="" class="post-img" loading="lazy">`)
+                .join('');
+
+                return `
+                <div class="post-card">
+                <div class="post-text">
+                <h2>${this.escapeHtml(post.title || 'Без названия')}</h2>
+                <p class="post-text-body">${this.escapeHtml(post.content || '')}</p>
+                <div class="post-info">
+                <img src="${SVG_COMMENT}" alt="Комменты">
+                <p>${this.escapeHtml(String(post.comment_count ?? '0'))}</p>
+                <img src="${SVG_LIKE}" alt="Лайки">
+                <p>${this.escapeHtml(String(post.like_count ?? '0'))}</p>
                 </div>
-                ${post.image_base64 ? `<img src="${LOGO}" alt="" class="post-img">` : ''}
-            </div>
-            `).join('');
+                </div>
+                ${imagesHtml}
+                </div>
+                `;
+            }).join('');
 
             this.render(feedHtml);
         } catch (err) {
@@ -89,7 +99,6 @@ export class Feed extends HTMLElement {
         }
     }
 
-    // Вспомогательная функция для защиты от XSS (если текст придет от пользователя)
     private escapeHtml(unsafe: string) {
         return unsafe
         .replace(/&/g, "&amp;")

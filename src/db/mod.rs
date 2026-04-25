@@ -138,15 +138,11 @@ impl Store {
 
     // ── Users ─────────────────────────────────────────────────────────────────
 
-    // В src/db/mod.rs, внутри impl Store:
     pub async fn db_is_member(&self, chat_id: i32, member_id: i32) -> Result<bool, StoreError> {
         Ok(self.db.is_chat_member(chat_id, member_id).await?)
     }
 
-    /// Обновление пользователя.
-    /// Если modifier == target — всё кроме roles.
-    /// Если нет — modifier должен быть admin.
-    /// Возвращает None при отказе в правах.
+
     pub async fn update_user(
         &self,
         target_id:   i32,
@@ -156,7 +152,7 @@ impl Store {
         avatar:      Option<&str>,
         tags:        Option<&str>,
         roles:       Option<&str>,
-    // ) -> Result<Option<User>, StoreError> {
+     ) -> Result<Option<User>, StoreError> {
         let user = self.db.update_user(
             target_id, modifier_id, name, pass, avatar, tags, roles,
         ).await?;
@@ -294,6 +290,10 @@ impl Store {
     }
 
     pub async fn send_message(&self, chat_id: i32, author_id: i32, content: &str, files: Option<&str>) -> Result<Message, StoreError> {
-            let msg = self.db.send_message(chat_id, author_id, content, files).await?;
+        let msg = self.db.send_message(chat_id, author_id, content, files).await?;
+        for lim in [20i64, 50, 100] {
+            self.cache.del(&format!("chat:msgs:{chat_id}:lim:{lim}")).await;
+        }
+        Ok(msg)
     }
-
+}
