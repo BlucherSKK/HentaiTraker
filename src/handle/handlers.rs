@@ -3,7 +3,6 @@ use tokio::sync::Mutex;
 use serde_json::{Value, json};
 use super::session::Session;
 use super::registry::{SessionRegistry, SessionEntry};
-use std::sync::Arc as StoreArc; // уже есть Arc, это для UploadTokenStore
 use crate::upload::UploadTokenStore;
 
 // ─── chat_join ────────────────────────────────────────────────────────────────
@@ -199,17 +198,6 @@ pub async fn profile_update(session: Arc<Mutex<Session>>, data: Value) {
     }
 }
 
-//  admin terminal
-pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value) {
-    let input = match data["input"].as_str() {
-        Some(s) => s.to_string(),
-        None => return,
-    };
-    session.lock().await.send_encrypted(&json!({
-        "event":  "terminal_output",
-        "output": format!("Получено: {input}"),
-    })).await;
-}
 
 // ─── chat_list ───────────────────────────────────────────────────────────────
 
@@ -328,4 +316,64 @@ pub async fn get_upload_token(
     let token = upload_store.create_token(user_id).await;
     let s = session.lock().await;
     s.send_encrypted(&json!({ "event": "upload_token", "token": token })).await;
+}
+
+// ─── terminal_cmd ─────────────────────────────────────────────────────────────
+
+/// Payload: `{ input: string }`
+pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value) {
+    let (store, user_id) = {
+        let s = session.lock().await;
+        (s.store.clone(), s.user_id)
+    };
+    let store   = match store   { Some(s) => s, None => return };
+    let user_id = match user_id { Some(id) => id, None => return };
+
+    let roles = match store.get_user(user_id).await {
+        Ok(Some(u)) => u.roles.unwrap_or_default(),
+        _ => return,
+    };
+    if !roles.split(',').any(|r| r.trim() == "admin") {
+        let s = session.lock().await;
+        s.send_encrypted(&json!({ "event": "error", "code": "forbidden" })).await;
+        return;
+    }
+
+    let input = match data["input"].as_str() {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return,
+    };
+
+    let output = handle_cmd(&input);
+    let s = session.lock().await;
+    s.send_encrypted(&json!({ "event": "terminal_output", "output": output })).await;
+}
+
+fn handle_cmd(input: &str) -> String {
+    let parts: Vec<&str> = input.splitn(2, ' ').collect();
+    let cmd  = parts[0];
+    let args = parts.get(1).copied().unwrap_or("").trim();
+
+    match cmd {
+        "help" => "\
+    доступные команды:
+    help          — эта справка
+    status        — статус сервера
+    version       — версия сервера
+    echo <текст>  — вернуть текст
+    clear         — очистить экран\
+    ".into(),
+
+    "status" => "сервер работает нормально".into(),
+
+    "version" => concat!("HentaiTracker v", env!("CARGO_PKG_VERSION")).into(),
+
+    "echo" => {
+        if args.is_empty() { String::new() } else { args.to_string() }
+    }
+
+    "clear" => "\x1b[2J".into(),
+
+    _ => format!("неизвестная команда: {cmd}. введите help для справки"),
+        }
 }

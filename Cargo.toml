@@ -20,7 +20,7 @@ serde = "1.0.228"
 serde_json = "1.0.149"
 sha2 = "0.11.0"
 sqlx = { version = "0.8.6", features = ["chrono", "postgres", "runtime-tokio"] }
-tokio = { version = "1.51.1", features = ["fs"] }
+tokio = { version = "1.52.1", features = ["fs"] }
 
 [features]
 QA = []

@@ -162,6 +162,12 @@ impl Store {
         Ok(user)
     }
 
+    pub async fn set_roles_direct(&self, user_id: i32, roles: &str) -> Result<(), StoreError> {
+        self.db.set_roles_direct(user_id, roles).await?;
+        self.cache.del(&format!("user:{user_id}")).await;
+        Ok(())
+    }
+
     pub async fn get_user(&self, id: i32) -> Result<Option<User>, StoreError> {
         let ck = format!("user:{id}");
         if let Some(u) = Self::cache_get::<User>(&self.cache, &ck).await { return Ok(Some(u)); }

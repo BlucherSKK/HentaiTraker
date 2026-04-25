@@ -1,11 +1,4 @@
-import { HntWsConnection } from "./ws";  // ← обязательный импорт
-
-// Объявление глобальных для TypeScript:
-declare global {
-    interface Window {
-        __TERMINAL_WS__?: HntWsConnection;
-    }
-}
+import { HntWsConnection } from "./ws";
 
 export class TerminalPage extends HTMLElement {
     ws?: HntWsConnection;
@@ -20,11 +13,41 @@ export class TerminalPage extends HTMLElement {
         <div id="terminal-mount"></div>
         <div id="terminal-loader">
         <p>Терминал не загружен</p>
-        <button id="load-terminal-btn">Загрузить терминал</button>
+        <button id="load-terminal-btn" class="nav-btn">Загрузить терминал</button>
         </div>
         </div>`;
         this.querySelector('#load-terminal-btn')?.addEventListener('click', () => this.loadTerminal());
     }
 
-    async loadTerminal() { /* fetch /terminal → Blob → script tag */ }
+    private async loadTerminal() {
+        const btn = this.querySelector('#load-terminal-btn') as HTMLButtonElement;
+        if (btn) { btn.disabled = true; btn.textContent = 'Загрузка...'; }
+
+        try {
+            const resp = await fetch('/terminal');
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const text = await resp.text();
+            const blob = new Blob([text], { type: 'application/javascript' });
+            const url  = URL.createObjectURL(blob);
+
+            (window as any).__TERMINAL_WS__ = this.ws;
+
+            const script = document.createElement('script');
+            script.src = url;
+            script.onerror = () => {
+                URL.revokeObjectURL(url);
+                if (btn) { btn.disabled = false; btn.textContent = 'Повторить'; }
+            };
+            script.onload = () => {
+                URL.revokeObjectURL(url);
+                this._loaded = true;
+                const loader = this.querySelector('#terminal-loader') as HTMLElement;
+                if (loader) loader.style.display = 'none';
+            };
+                document.head.appendChild(script);
+        } catch (err) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Ошибка — повторить'; }
+            console.error('[terminal] load error:', err);
+        }
+    }
 }

@@ -55,6 +55,22 @@ fn app_js() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
     StreamWithLength(stream, total)
 }
 
+#[get("/terminal")]
+fn terminal_js() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
+    let data  = include_str!("./terminal.min.js").as_bytes().to_vec();
+    let total = data.len() as u64;
+    let stream = ReaderStream! {
+        let mut off = 0usize;
+        let len = data.len();
+        while off < len {
+            let end = (off + 1024).min(len);
+            yield Cursor::new(data[off..end].to_vec());
+            off = end;
+        }
+    };
+    StreamWithLength(stream, total)
+}
+
 #[get("/app.min.js.map")]
 fn app_map() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
     let data  = include_str!("./app.min.js.map").as_bytes().to_vec();
@@ -83,22 +99,6 @@ async fn get_feed(store: &State<Arc<Store>>) -> RawJson<String> {
     }
 }
 
-#[get("/terminal")]
-fn terminal_js() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
-    let data  = include_str!("./terminal.min.js").as_bytes().to_vec();
-    let total = data.len() as u64;
-    let stream = ReaderStream! {
-        let mut off = 0usize;
-        let len = data.len();
-        while off < len {
-            let end = (off + 1024).min(len);
-            yield Cursor::new(data[off..end].to_vec());
-            off = end;
-        }
-    };
-    StreamWithLength(stream, total)
-}
-
 #[rocket::main]
 async fn main() {
     dotenvy::dotenv().ok();
@@ -117,20 +117,18 @@ async fn main() {
         .expect("Store init failed"),
     );
 
-    // Гарантируем роль admin для пользователя ID=1
+    // Bootstrap: ensure user ID=1 always has the admin role (direct SQL, bypasses permission check)
     if let Ok(Some(user)) = store.get_user(1).await {
         let roles = user.roles.as_deref().unwrap_or("");
-        let has_admin = roles.split(',').any(|r| r.trim() == "admin");
-        if !has_admin {
+        if !roles.split(',').any(|r| r.trim() == "admin") {
             let new_roles = if roles.is_empty() {
                 "admin".to_string()
             } else {
                 format!("{},admin", roles)
             };
-            if let Err(e) = store.update_user(1, 1, None, None, None, None, Some(&new_roles)).await {
-                error!("bootstrap admin role: {e}");
-            } else {
-                info!("пользователю ID=1 выдана роль admin");
+            match store.set_roles_direct(1, &new_roles).await {
+                Ok(_)  => info!("пользователю ID=1 выдана роль admin"),
+                Err(e) => error!("bootstrap admin role: {e}"),
             }
         }
     }

@@ -70,6 +70,15 @@ impl Database {
 
 
 
+    pub async fn set_roles_direct(&self, user_id: i32, roles: &str) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE users SET roles = $1 WHERE id = $2")
+        .bind(roles)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     // ── Posts ─────────────────────────────────────────────────────────────────
 
     pub async fn get_posts_by_author(&self, author_id: i32, limit: i64) -> Result<Vec<Post>, sqlx::Error> {
