@@ -4,6 +4,7 @@ use serde_json::{Value, json};
 use super::session::Session;
 use super::registry::{SessionRegistry, SessionEntry};
 use crate::upload::UploadTokenStore;
+use crate::admin;
 
 // ─── chat_join ────────────────────────────────────────────────────────────────
 
@@ -344,36 +345,9 @@ pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value) {
         _ => return,
     };
 
-    let output = handle_cmd(&input);
+    let output = admin::hnts_shell_exec(&input);
     let s = session.lock().await;
     s.send_encrypted(&json!({ "event": "terminal_output", "output": output })).await;
 }
 
-fn handle_cmd(input: &str) -> String {
-    let parts: Vec<&str> = input.splitn(2, ' ').collect();
-    let cmd  = parts[0];
-    let args = parts.get(1).copied().unwrap_or("").trim();
 
-    match cmd {
-        "help" => "\
-    доступные команды:
-    help          — эта справка
-    status        — статус сервера
-    version       — версия сервера
-    echo <текст>  — вернуть текст
-    clear         — очистить экран\
-    ".into(),
-
-    "status" => "сервер работает нормально".into(),
-
-    "version" => concat!("HentaiTracker v", env!("CARGO_PKG_VERSION")).into(),
-
-    "echo" => {
-        if args.is_empty() { String::new() } else { args.to_string() }
-    }
-
-    "clear" => "\x1b[2J".into(),
-
-    _ => format!("неизвестная команда: {cmd}. введите help для справки"),
-        }
-}

@@ -24,8 +24,19 @@ export class TerminalPage extends HTMLElement {
         if (btn) { btn.disabled = true; btn.textContent = 'Загрузка...'; }
 
         try {
+            // Регистрируем хелпер для модуля
+            (window as any).__registerModuleStyles = (id: string, css: string) => {
+                const styleId = `module-styles-${id}`;
+                if (document.getElementById(styleId)) return;
+                const style = document.createElement('style');
+                style.id          = styleId;
+                style.textContent = css;
+                document.head.appendChild(style);
+            };
+
             const resp = await fetch('/terminal');
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
             const text = await resp.text();
             const blob = new Blob([text], { type: 'application/javascript' });
             const url  = URL.createObjectURL(blob);
@@ -45,6 +56,7 @@ export class TerminalPage extends HTMLElement {
                 if (loader) loader.style.display = 'none';
             };
                 document.head.appendChild(script);
+
         } catch (err) {
             if (btn) { btn.disabled = false; btn.textContent = 'Ошибка — повторить'; }
             console.error('[terminal] load error:', err);

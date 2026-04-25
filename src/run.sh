@@ -35,6 +35,9 @@ replace_from_file() {
 mkdir -p ./tmp/tempapp
 cp ../client/* ./tmp/tempapp/
 
+mkdir -p ./tmp/mod-admin-term
+cp ../admin-term/* ./tmp/mod-admin-term
+
 # Обработка файлов для assets.ts
 img_to_base64 ../client/logo.png > ./tmp/val.tmp && replace_from_file ./tmp/tempapp/assets.ts "##LOGO##" ./tmp/val.tmp
 cat ../client/style.css | tr -d '\r\n' | sed 's/  */ /g' > ./tmp/val.tmp && replace_from_file ./tmp/tempapp/assets.ts "##STYLE##" ./tmp/val.tmp
@@ -42,11 +45,12 @@ cat ../client/home-body.html | tr -d '\r\n' | sed 's/  */ /g' > ./tmp/val.tmp &&
 img_to_base64 ../client/like.svg > ./tmp/val.tmp && replace_from_file ./tmp/tempapp/assets.ts "##LIKESVG##" ./tmp/val.tmp
 img_to_base64 ../client/comment.svg > ./tmp/val.tmp && replace_from_file ./tmp/tempapp/assets.ts "##COMMENTSVG##" ./tmp/val.tmp
 img_to_base64 ../client/login.svg > ./tmp/val.tmp && replace_from_file ./tmp/tempapp/assets.ts "##LOGINSVG##" ./tmp/val.tmp
+cat ../admin-term/style.css | tr -d '\r\n' | sed 's/  */ /g' > ./tmp/val.tmp && replace_from_file ./tmp/mod-admin-term/assets.ts "##STYLE##" ./tmp/val.tmp
 
 # Сборка JS
 esbuild ./tmp/tempapp/app.ts --bundle --minify --sourcemap --target=es6 --outfile=./app.min.js
-# Сборка терминального модуля (без sourcemap, IIFE)
-esbuild ./tmp/tempapp/terminal_module.ts --bundle --minify --target=es6 --outfile=./terminal.min.js
+# Сборка терминального модуля
+esbuild ./tmp/mod-admin-term/mod.ts --bundle --minify --target=es6 --outfile=./terminal.min.js
 
 # Обработка лоадера (GIF)
 img_to_base64 ./tmp/tempapp/catgirl.gif > ./tmp/gif_b64.tmp

@@ -9,3 +9,5 @@ export const SVG_LIKE = "##LIKESVG##";
 export const SVG_COMMENT = "##COMMENTSVG##";
 
 export const SVG_LOGIN = "##LOGINSVG##";
+
+export type ModuleStyleRegistry = Record<string, string>;

@@ -15,6 +15,8 @@ mod handle;
 mod hnts;
 mod secure;
 
+mod admin;
+
 mod upload;
 use upload::UploadTokenStore;
 
