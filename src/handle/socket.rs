@@ -145,6 +145,10 @@ pub fn ws(
             handlers::chat_list(sess, data).await
         });
 
+        router.on("terminal_cmd", |sess, data| async move {
+            handlers::terminal_cmd(sess, data).await
+        });
+
         router.on("profile_get", |sess, data| async move {
             handlers::profile_get(sess, data).await
         });
@@ -245,6 +249,7 @@ pub fn ws(
                                             "priv_at":  priv_at,
                                             "user_id":  user.id,
                                             "username": user.name,
+                                            "roles":    user.roles,
                                         }).to_string().as_bytes());
 
                                         let mut s = session.lock().await;

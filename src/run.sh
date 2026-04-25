@@ -45,6 +45,8 @@ img_to_base64 ../client/login.svg > ./tmp/val.tmp && replace_from_file ./tmp/tem
 
 # Сборка JS
 esbuild ./tmp/tempapp/app.ts --bundle --minify --sourcemap --target=es6 --outfile=./app.min.js
+# Сборка терминального модуля (без sourcemap, IIFE)
+esbuild ./tmp/tempapp/terminal_module.ts --bundle --minify --target=es6 --outfile=./terminal.min.js
 
 # Обработка лоадера (GIF)
 img_to_base64 ./tmp/tempapp/catgirl.gif > ./tmp/gif_b64.tmp

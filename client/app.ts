@@ -7,6 +7,7 @@ import { Feed, HomeNav } from "./home";
 import { AppNav } from "./nav";
 import { HntWsConnection } from "./ws";
 import { ProfilePage } from "./profile";
+import { TerminalPage } from "./terminal";
 
 declare global {
     interface Window {
@@ -27,10 +28,11 @@ export interface User {
     name: string;
     id: string;
     token: string;
+    roles: string;
     tagpool: Tags[];
 }
 
-type PageType = 'feeds' | 'projects' | 'settings' | 'login' | 'dm' | 'chats' | 'profile';
+type PageType = 'feeds' | 'projects' | 'settings' | 'login' | 'dm' | 'chats' | 'profile' | 'terminal';
 
 interface AppState {
     page: PageType;
@@ -48,6 +50,7 @@ customElements.define('app-nav',   AppNav);
 customElements.define('app-chats', Chats);
 customElements.define('app-auth',  AuthPage);
 customElements.define('app-profile', ProfilePage);
+customElements.define('app-terminal', TerminalPage);
 
 const App = {
     state: {
@@ -85,6 +88,7 @@ const App = {
                 name:    payload.username as string,
                 id:      String(payload.user_id),
                 token:   payload.pub_at   as string,
+                roles: (payload.roles as string | null) ?? '',
                 tagpool: [],
             };
             this.state.page = this.state.lastpage === 'login' ? 'feeds' : this.state.lastpage;
@@ -145,16 +149,22 @@ const App = {
                 authElem.ws = this.state.ws;
             }
         }
+
+        if (this.state.page === 'terminal') {
+            const termElem = root.querySelector('app-terminal') as TerminalPage;
+            if (termElem) { termElem.ws = this.state.ws; termElem.render(); }
+        }
     },
 
     getContentByPage(): string {
-        const nav = `<app-nav data-link="${this.state.page}"></app-nav>`;
+        const nav = `<app-nav data-link="${this.state.page}" data-user-roles="${this.state.user?.roles || ''}"></app-nav>`;
         switch (this.state.page) {
             case 'feeds':  return `${nav}<app-feed></app-feed>`;
             case 'dm':     return `${nav}${this.state.user ? "" : get_nonlogin_dm_noty()}`;
             case 'chats':  return `${nav}<app-chats />`;
             case 'login':  return `<app-auth></app-auth>`;
             case 'profile': return `${nav}<app-profile></app-profile>`;
+            case 'terminal': return `${nav}<app-terminal></app-terminal>`;
             default:       return nav;
         }
     },

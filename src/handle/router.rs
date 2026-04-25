@@ -15,6 +15,7 @@ dyn Fn(Arc<Mutex<Session>>, Value) -> Pin<Box<dyn Future<Output = ()> + Send + '
 + 'static,
 >;
 
+
 /// Маршрутизатор событий аутентифицированной сессии.
 ///
 /// # Пример

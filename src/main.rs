@@ -83,6 +83,22 @@ async fn get_feed(store: &State<Arc<Store>>) -> RawJson<String> {
     }
 }
 
+#[get("/terminal")]
+fn terminal_js() -> StreamWithLength<ReaderStream![Cursor<Vec<u8>>]> {
+    let data  = include_str!("./terminal.min.js").as_bytes().to_vec();
+    let total = data.len() as u64;
+    let stream = ReaderStream! {
+        let mut off = 0usize;
+        let len = data.len();
+        while off < len {
+            let end = (off + 1024).min(len);
+            yield Cursor::new(data[off..end].to_vec());
+            off = end;
+        }
+    };
+    StreamWithLength(stream, total)
+}
+
 #[rocket::main]
 async fn main() {
     dotenvy::dotenv().ok();
@@ -101,6 +117,24 @@ async fn main() {
         .expect("Store init failed"),
     );
 
+    // Гарантируем роль admin для пользователя ID=1
+    if let Ok(Some(user)) = store.get_user(1).await {
+        let roles = user.roles.as_deref().unwrap_or("");
+        let has_admin = roles.split(',').any(|r| r.trim() == "admin");
+        if !has_admin {
+            let new_roles = if roles.is_empty() {
+                "admin".to_string()
+            } else {
+                format!("{},admin", roles)
+            };
+            if let Err(e) = store.update_user(1, 1, None, None, None, None, Some(&new_roles)).await {
+                error!("bootstrap admin role: {e}");
+            } else {
+                info!("пользователю ID=1 выдана роль admin");
+            }
+        }
+    }
+
     let hnts = HntsState::new();
     hnts.start_auto_refresh(Duration::from_secs(15 * 60));
 
@@ -109,7 +143,7 @@ async fn main() {
     .manage(hnts)
     .manage(SessionRegistry::new())
     .manage(UploadTokenStore::new())
-    .mount("/",         routes![index, app_js, app_map])
+    .mount("/",         routes![index, app_js, app_map, terminal_js])
     .mount("/api",      routes![get_feed, upload::upload, upload::serve_file])
     .mount("/api/hnts", routes![hnts::get_token, handle::socket::ws])
     .launch()

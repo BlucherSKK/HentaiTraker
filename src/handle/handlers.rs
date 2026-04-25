@@ -199,6 +199,17 @@ pub async fn profile_update(session: Arc<Mutex<Session>>, data: Value) {
     }
 }
 
+//  admin terminal
+pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value) {
+    let input = match data["input"].as_str() {
+        Some(s) => s.to_string(),
+        None => return,
+    };
+    session.lock().await.send_encrypted(&json!({
+        "event":  "terminal_output",
+        "output": format!("Получено: {input}"),
+    })).await;
+}
 
 // ─── chat_list ───────────────────────────────────────────────────────────────
 
