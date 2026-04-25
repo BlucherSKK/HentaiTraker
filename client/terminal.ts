@@ -1,65 +1,82 @@
 import { HntWsConnection } from "./ws";
 
+declare global {
+    interface Window {
+        __TERMINAL_WS__?: HntWsConnection;
+        __TERMINAL_INIT__?: () => void;
+    }
+}
+
 export class TerminalPage extends HTMLElement {
     ws?: HntWsConnection;
     private _loaded = false;
 
-    connectedCallback() { this.render(); }
+    connectedCallback() {
+        this.render();
+        this.loadTerminal();
+    }
 
     render() {
-        if (this._loaded) return;
         this.innerHTML = `
         <div class="terminal-wrapper">
         <div id="terminal-mount"></div>
         <div id="terminal-loader">
-        <p>Терминал не загружен</p>
-        <button id="load-terminal-btn" class="nav-btn">Загрузить терминал</button>
+        <div class="loader"></div>
+        <p>Загрузка терминала…</p>
         </div>
         </div>`;
-        this.querySelector('#load-terminal-btn')?.addEventListener('click', () => this.loadTerminal());
     }
 
-    private async loadTerminal() {
-        const btn = this.querySelector('#load-terminal-btn') as HTMLButtonElement;
-        if (btn) { btn.disabled = true; btn.textContent = 'Загрузка...'; }
+    async loadTerminal() {
+        if (this._loaded) return;
+        this._loaded = true;
+
+        // ws может прийти либо через атрибут (app.ts), либо уже висеть на window
+        const ws = this.ws ?? window.__TERMINAL_WS__;
+        if (!ws) {
+            this.showError('WebSocket недоступен');
+            return;
+        }
+
+        // Гарантируем что window.__TERMINAL_WS__ выставлен для terminal_module
+        window.__TERMINAL_WS__ = ws;
+
+        if (window.__TERMINAL_INIT__) {
+            // Модуль уже загружен — просто переинициализируем UI в новый DOM
+            window.__TERMINAL_INIT__();
+            this.hideLoader();
+            return;
+        }
 
         try {
-            // Регистрируем хелпер для модуля
-            (window as any).__registerModuleStyles = (id: string, css: string) => {
-                const styleId = `module-styles-${id}`;
-                if (document.getElementById(styleId)) return;
-                const style = document.createElement('style');
-                style.id          = styleId;
-                style.textContent = css;
-                document.head.appendChild(style);
-            };
-
             const resp = await fetch('/terminal');
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-            const text = await resp.text();
-            const blob = new Blob([text], { type: 'application/javascript' });
+            const blob = await resp.blob();
             const url  = URL.createObjectURL(blob);
 
-            (window as any).__TERMINAL_WS__ = this.ws;
+            await new Promise<void>((resolve, reject) => {
+                const script   = document.createElement('script');
+                script.src     = url;
+                script.onload  = () => { URL.revokeObjectURL(url); resolve(); };
+                script.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Ошибка скрипта')); };
+                document.body.appendChild(script);
+            });
 
-            const script = document.createElement('script');
-            script.src = url;
-            script.onerror = () => {
-                URL.revokeObjectURL(url);
-                if (btn) { btn.disabled = false; btn.textContent = 'Повторить'; }
-            };
-            script.onload = () => {
-                URL.revokeObjectURL(url);
-                this._loaded = true;
-                const loader = this.querySelector('#terminal-loader') as HTMLElement;
-                if (loader) loader.style.display = 'none';
-            };
-                document.head.appendChild(script);
+            this.hideLoader();
 
         } catch (err) {
-            if (btn) { btn.disabled = false; btn.textContent = 'Ошибка — повторить'; }
-            console.error('[terminal] load error:', err);
+            this.showError(`Ошибка загрузки: ${err}`);
         }
+    }
+
+    private hideLoader() {
+        const loader = this.querySelector<HTMLElement>('#terminal-loader');
+        if (loader) loader.style.display = 'none';
+    }
+
+    private showError(msg: string) {
+        const loader = this.querySelector('#terminal-loader');
+        if (loader) loader.innerHTML = `<p style="color:#f87171">⚠ ${msg}</p>`;
     }
 }

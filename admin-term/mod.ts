@@ -1,6 +1,6 @@
 import { STYLE } from "./assets";
 
-(function() {
+(window as any).__TERMINAL_INIT__ = function() {
     const ws    = (window as any).__TERMINAL_WS__;
     const mount = document.getElementById('terminal-mount');
     const loader = document.getElementById('terminal-loader');
@@ -42,16 +42,21 @@ function appendLine(text: string, color = 'std', margin_left = '0') {
 appendLine('[терминал] Подключено. Введите команду.', 'info');
 
 
-// Получение ответов от сервера
 ws.on('terminal_output', (_: string, p: Record<string, unknown>) => {
     let content = String(p.output ?? '');
     if (content.includes('#NL#')) {
         let p_content = content.split('#NL#');
         p_content.map((line: string) => {
+            let color = 'std';
+            if(line.includes('#C#')){
+                let arr = line.split('#C#');
+                color = arr[1];
+                line = line.replace(/#C#.*?#C#/g, '');
+            }
             if(line.includes('#T#')){
-                appendLine(line.replace('#T#', ''), 'std', '4rem');
+                appendLine(line.replace('#T#', ''), color, '4rem');
             } else {
-                appendLine(line);
+                appendLine(line, color);
             }
         })
     } else {
@@ -77,4 +82,6 @@ input.addEventListener('keydown', async (e: KeyboardEvent) => {
 });
 
 input.focus();
-})();
+};
+
+(window as any).__TERMINAL_INIT__();

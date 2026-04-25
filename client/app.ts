@@ -185,8 +185,12 @@ const App = {
             if (el) { el.ws = this.state.ws; }
         }
         if (this.state.page === 'terminal') {
-            const el = hero.querySelector('app-terminal') as TerminalPage;
-            if (el) { el.ws = this.state.ws; }
+            const termElem = root.querySelector('app-terminal') as TerminalPage;
+            if (termElem) {
+                window.__TERMINAL_WS__ = this.state.ws;  // ← вот это было пропущено
+                termElem.ws = this.state.ws;
+                termElem.render();
+            }
         }
     },
 
