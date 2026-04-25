@@ -143,6 +143,7 @@ async fn main() {
     .manage(hnts)
     .manage(SessionRegistry::new())
     .manage(UploadTokenStore::new())
+    .manage(admin::metric::ServerState::new())
     .mount("/",         routes![index, app_js, app_map, terminal_js])
     .mount("/api",      routes![get_feed, upload::upload, upload::serve_file])
     .mount("/api/hnts", routes![hnts::get_token, handle::socket::ws])

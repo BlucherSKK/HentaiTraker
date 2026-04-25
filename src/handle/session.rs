@@ -34,6 +34,7 @@ pub struct Session {
     pub connected_at:  Instant,
     pub last_activity: Instant,
     pub store:         Option<Arc<Store>>,
+    pub is_authenticated: bool,
 }
 
 impl Session {
@@ -49,6 +50,7 @@ impl Session {
             connected_at:  now,
             last_activity: now,
             store:         None,
+            is_authenticated: false,
         }
     }
 

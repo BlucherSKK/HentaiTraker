@@ -14,6 +14,7 @@ use crate::hnts::HntsState;
 use crate::db::Store;
 use crate::secure;
 use crate::upload::UploadTokenStore;
+use crate::admin::metric;
 
 enum StateCtx {
     Entrypoint,
@@ -75,6 +76,7 @@ async fn handle_token_refresh(sess: &mut Session) {
     }
 }
 
+
 #[get("/ws/<pub_vtns>")]
 pub fn ws(
     ws:           WebSocket,
@@ -83,13 +85,16 @@ pub fn ws(
     store:        &State<Arc<Store>>,
     registry:     &State<SessionRegistry>,
     upload_store: &State<Arc<UploadTokenStore>>,
+    srv_state:    &State<metric::ServerState>,
 ) -> Channel<'static> {
     let hnts         = hnts.inner().clone();
     let store        = Arc::clone(store.inner());
     let registry     = registry.inner().clone();
     let upload_store = Arc::clone(upload_store.inner());
+    let srv_state    = srv_state.inner().clone();
 
     ws.channel(move |stream| Box::pin(async move {
+        srv_state.on_connect().await;
         let (mut sink, mut source) = stream.split();
         let (tx, mut rx)           = mpsc::channel::<Message>(32);
 
@@ -125,10 +130,12 @@ pub fn ws(
             });
         }
         {
-            let r = Arc::clone(&reg);
+            let r  = Arc::clone(&reg);
+            let ss = srv_state.clone();
             router.on("message_create", move |sess, data| {
-                let r = Arc::clone(&r);
-                async move { handlers::message_create(sess, data, r).await }
+                let r  = Arc::clone(&r);
+                let ss = ss.clone();
+                async move { handlers::message_create(sess, data, r, ss).await }
             });
         }
         router.on("message_list", |sess, data| async move {
@@ -152,9 +159,13 @@ pub fn ws(
             handlers::profile_update(sess, data).await
         });
 
-        router.on("terminal_cmd", |sess, data| async move {
-            handlers::terminal_cmd(sess, data).await
-        });
+        {
+            let ss = srv_state.clone();
+            router.on("terminal_cmd", move |sess, data| {
+                let ss = ss.clone();
+                async move { handlers::terminal_cmd(sess, data, ss).await }
+            });
+        }
 
         let router = Arc::new(router);
 
@@ -330,6 +341,8 @@ pub fn ws(
                 StateCtx::Authenticated(priv_at) => {
                     match decrypt_and_parse(&priv_at, &raw) {
                         Some((event, payload)) => {
+                            session.lock().await.is_authenticated = true;
+                            srv_state.on_user_authenticated().await;
                             router.dispatch(&event, Arc::clone(&session), payload).await;
                         }
                         None => {
@@ -366,6 +379,10 @@ pub fn ws(
         }
 
         { registry.leave(&session.lock().await.id).await; }
+        let is_auth = session.lock().await.is_authenticated;
+        registry.leave(&session.lock().await.id).await;
+        srv_state.on_disconnect().await;
+        if is_auth { srv_state.on_user_left().await; }
 
         Ok(())
     }))

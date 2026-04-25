@@ -5,7 +5,7 @@ use super::session::Session;
 use super::registry::{SessionRegistry, SessionEntry};
 use crate::upload::UploadTokenStore;
 use crate::admin;
-
+use crate::admin::metric;
 // ─── chat_join ────────────────────────────────────────────────────────────────
 
 /// Вступление пользователя в существующий чат.
@@ -231,6 +231,7 @@ pub async fn message_create(
     session:  Arc<Mutex<Session>>,
     data:     Value,
     registry: Arc<SessionRegistry>,
+    srv_state: metric::ServerState,
 ) {
     let (store, user_id, session_id) = {
         let s = session.lock().await;
@@ -248,6 +249,7 @@ pub async fn message_create(
 
     match store.send_message(chat_id, user_id, &content, files.as_deref()).await {
         Ok(msg) => {
+            srv_state.on_message_sent().await;
             let broadcast = json!({
                 "event":     "new_message",
                 "id":        msg.id,
@@ -322,7 +324,7 @@ pub async fn get_upload_token(
 // ─── terminal_cmd ─────────────────────────────────────────────────────────────
 
 /// Payload: `{ input: string }`
-pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value) {
+pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value, srv_state: metric::ServerState) {
     let (store, user_id) = {
         let s = session.lock().await;
         (s.store.clone(), s.user_id)
@@ -345,7 +347,7 @@ pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value) {
         _ => return,
     };
 
-    let output = admin::hnts_shell_exec(&input);
+    let output = admin::hnts_shell_exec(&input, srv_state.snapshot().await.format());
     let s = session.lock().await;
     s.send_encrypted(&json!({ "event": "terminal_output", "output": output })).await;
 }

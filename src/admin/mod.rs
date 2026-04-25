@@ -1,8 +1,8 @@
+pub mod metric;
 
 
 
-
-pub fn hnts_shell_exec(input: &str) -> String {
+pub fn hnts_shell_exec(input: &str, snpashot: String) -> String {
     let parts: Vec<&str> = input.splitn(2, ' ').collect();
     let cmd  = parts[0];
     let args = parts.get(1).copied().unwrap_or("").trim();
@@ -23,6 +23,15 @@ pub fn hnts_shell_exec(input: &str) -> String {
 "echo" => {
     if args.is_empty() { String::new() } else { args.to_string() }
 }
+
+"fetch" => format!("\
+░░░█░█░█▀▀░█▀█░▀█▀░█▀█░▀█▀░░░░#C#purple#C##NL#\
+░░░█▀█░█▀▀░█░█░░█░░█▀█░░█░░░░░#C#purple#C##NL#\
+░░░▀░▀░▀▀▀░▀░▀░░▀░░▀░▀░▀▀▀░░░░#C#purple#C##NL#\
+░▀█▀░█▀▄░█▀█░█▀▀░█░█░█▀▀░█▀▄░░#C#cyan#C##NL#\
+░░█░░█▀▄░█▀█░█░░░█▀▄░█▀▀░█▀▄░░#C#cyan#C##NL#\
+░░▀░░▀░▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀░░#C#cyan#C##NL#\
+{}", snpashot).into(),
 
 "clear" => "\x1b[2J".into(),
 

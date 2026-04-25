@@ -42,16 +42,21 @@ function appendLine(text: string, color = 'std', margin_left = '0') {
 appendLine('[терминал] Подключено. Введите команду.', 'info');
 
 
-// Получение ответов от сервера
 ws.on('terminal_output', (_: string, p: Record<string, unknown>) => {
     let content = String(p.output ?? '');
     if (content.includes('#NL#')) {
         let p_content = content.split('#NL#');
         p_content.map((line: string) => {
+            let color = 'std';
+            if(line.includes('#C#')){
+                let arr = line.split('#C#');
+                color = arr[1];
+                line = line.replace(RegExp('#C#*#C#'), '');
+            }
             if(line.includes('#T#')){
-                appendLine(line.replace('#T#', ''), 'std', '4rem');
+                appendLine(line.replace('#T#', ''), color, '4rem');
             } else {
-                appendLine(line);
+                appendLine(line, color);
             }
         })
     } else {
