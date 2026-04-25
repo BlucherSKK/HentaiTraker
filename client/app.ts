@@ -63,6 +63,10 @@ const App = {
         this.applyStyles();
         this.render();
         this.initNavigation();
+
+        (window as any).__registerModuleStyles = (id: string, css: string) => {
+            this.registerModuleStyles(id, css);
+        };
     },
 
     initWs(): void {
@@ -187,9 +191,8 @@ const App = {
         if (this.state.page === 'terminal') {
             const termElem = root.querySelector('app-terminal') as TerminalPage;
             if (termElem) {
-                window.__TERMINAL_WS__ = this.state.ws;  // ← вот это было пропущено
+                window.__TERMINAL_WS__ = this.state.ws;
                 termElem.ws = this.state.ws;
-                termElem.render();
             }
         }
     },

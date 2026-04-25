@@ -8,15 +8,32 @@ declare global {
 }
 
 export class TerminalPage extends HTMLElement {
-    ws?: HntWsConnection;
-    private _loaded = false;
+    private _ws?: HntWsConnection;
+    private _started = false;  // загрузка скрипта началась
 
-    connectedCallback() {
-        this.render();
-        this.loadTerminal();
+    get ws(): HntWsConnection | undefined { return this._ws; }
+
+    // app.ts присваивает ws ПОСЛЕ создания элемента — ловим это здесь
+    set ws(val: HntWsConnection | undefined) {
+        this._ws = val;
+        if (val && this.isConnected) {
+            this._start();
+        }
     }
 
-    render() {
+    connectedCallback() {
+        this._renderShell();
+        // на случай если ws уже был присвоен до вставки в DOM (маловероятно, но надёжно)
+        if (this._ws) {
+            this._start();
+        }
+    }
+
+    // вызывается из app.ts после ws= — просто ничего не делаем,
+    // загрузка уже идёт через setter
+    render() {}
+
+    private _renderShell() {
         this.innerHTML = `
         <div class="terminal-wrapper">
         <div id="terminal-mount"></div>
@@ -27,24 +44,23 @@ export class TerminalPage extends HTMLElement {
         </div>`;
     }
 
-    async loadTerminal() {
-        if (this._loaded) return;
-        this._loaded = true;
-
-        // ws может прийти либо через атрибут (app.ts), либо уже висеть на window
-        const ws = this.ws ?? window.__TERMINAL_WS__;
-        if (!ws) {
-            this.showError('WebSocket недоступен');
+    private async _start() {
+        if (this._started) {
+            // Скрипт уже загружен, просто переинициализируем UI в новый DOM
+            if (window.__TERMINAL_INIT__) {
+                window.__TERMINAL_WS__ = this._ws;
+                window.__TERMINAL_INIT__();
+                this._hideLoader();
+            }
             return;
         }
+        this._started = true;
 
-        // Гарантируем что window.__TERMINAL_WS__ выставлен для terminal_module
-        window.__TERMINAL_WS__ = ws;
+        window.__TERMINAL_WS__ = this._ws;
 
         if (window.__TERMINAL_INIT__) {
-            // Модуль уже загружен — просто переинициализируем UI в новый DOM
             window.__TERMINAL_INIT__();
-            this.hideLoader();
+            this._hideLoader();
             return;
         }
 
@@ -63,19 +79,19 @@ export class TerminalPage extends HTMLElement {
                 document.body.appendChild(script);
             });
 
-            this.hideLoader();
+            this._hideLoader();
 
         } catch (err) {
-            this.showError(`Ошибка загрузки: ${err}`);
+            this._showError(`Ошибка загрузки: ${err}`);
         }
     }
 
-    private hideLoader() {
+    private _hideLoader() {
         const loader = this.querySelector<HTMLElement>('#terminal-loader');
         if (loader) loader.style.display = 'none';
     }
 
-    private showError(msg: string) {
+    private _showError(msg: string) {
         const loader = this.querySelector('#terminal-loader');
         if (loader) loader.innerHTML = `<p style="color:#f87171">⚠ ${msg}</p>`;
     }
