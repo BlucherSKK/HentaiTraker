@@ -252,9 +252,17 @@ impl Store {
         title:     Option<&str>,
         content:   &str,
         files:     Option<&str>,
+        tags:      &str,
     ) -> Result<Post, StoreError> {
-        Ok(self.db.insert_post_with_files(author_id, title, content, files).await?)
+        let post = self.db.insert_post_with_files(author_id, title, content, files, tags).await?;
+        for lim in [20i64, 50, 100] {
+            self.cache.del(&format!("feed:posts:{lim}")).await;
+        }
+        self.cache.del("feed:latest").await;
+        Ok(post)
     }
+
+
 
     // ── Chats ─────────────────────────────────────────────────────────────────
 

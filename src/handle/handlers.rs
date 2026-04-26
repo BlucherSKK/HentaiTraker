@@ -227,6 +227,21 @@ pub async fn chat_list(session: Arc<Mutex<Session>>, _data: Value) {
 
 // ----- post_create -----
 
+
+fn validate_tags(raw: &str) -> String {
+    let mut tags: Vec<&str> = raw
+    .split(',')
+    .map(str::trim)
+    .filter(|t| !t.is_empty() && t.chars().all(|c| c.is_ascii_lowercase() || c == '_'))
+    .collect();
+
+    if !tags.contains(&"any") {
+        tags.insert(0, "any");
+    }
+
+    tags.join(",")
+}
+
 /// Payload: `{ title?: string, content: string, files?: string }`
 /// Ответ:   `{ event: "post_created", post: { id, title, content, files, author_id, time } }`
 pub async fn post_create(session: Arc<Mutex<Session>>, data: Value) {
@@ -256,6 +271,7 @@ pub async fn post_create(session: Arc<Mutex<Session>>, data: Value) {
     let title   = data["title"].as_str().map(|s| s.trim()).filter(|s| !s.is_empty());
     let content = data["content"].as_str().unwrap_or("").trim().to_string();
     let files   = data["files"].as_str().filter(|s| !s.is_empty()).map(|s| s.to_string());
+    let tags    = validate_tags(data["tags"].as_str().unwrap_or(""));
 
     if content.is_empty() {
         let s = session.lock().await;
@@ -263,7 +279,7 @@ pub async fn post_create(session: Arc<Mutex<Session>>, data: Value) {
         return;
     }
 
-    match store.create_post(user_id, title, &content, files.as_deref()).await {
+    match store.create_post(user_id, title, &content, files.as_deref(), &tags).await {
         Ok(post) => {
             let s = session.lock().await;
             s.send_encrypted(&json!({
@@ -273,6 +289,7 @@ pub async fn post_create(session: Arc<Mutex<Session>>, data: Value) {
                     "title":     post.title,
                     "content":   post.content,
                     "files":     post.files,
+                    "tags":      post.tags,
                     "author_id": post.author_id,
                     "time":      post.time.to_string(),
                 }
@@ -285,6 +302,32 @@ pub async fn post_create(session: Arc<Mutex<Session>>, data: Value) {
         }
     }
 }
+
+
+pub async fn user_posts(session: Arc<Mutex<Session>>, data: Value) {
+    let (store, user_id) = {
+        let s = session.lock().await;
+        (s.store.clone(), s.user_id)
+    };
+    let store   = match store   { Some(s) => s, None => return };
+    let user_id = match user_id { Some(id) => id, None => return };
+
+    let limit = data["limit"].as_i64().unwrap_or(20).clamp(1, 100);
+
+    match store.get_posts_by_author(user_id, limit).await {
+        Ok(posts) => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "user_posts", "posts": posts })).await;
+        }
+        Err(e) => {
+            error!("user_posts: {e}");
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+        }
+    }
+}
+
+
 
 // ─── message_create ───────────────────────────────────────────────────────────
 

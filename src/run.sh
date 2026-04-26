@@ -60,6 +60,6 @@ cp ./tmp/tempapp/loader.html ./loader.min.html
 
 # Очистка
 rm -f ./tmp/val.tmp ./tmp/gif_b64.tmp
-rm -rf ./tmp/tempapp
+rm -rf ./tmp
 
 cargo run

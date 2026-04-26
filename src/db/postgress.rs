@@ -89,9 +89,10 @@ impl Database {
         title:     Option<&str>,
         content:   &str,
         files:     Option<&str>,
+        tags:      &str,
     ) -> Result<Post, sqlx::Error> {
-        sqlx::query_as::<_, Post>("SELECT * FROM db_insert_post_with_files($1, $2, $3, $4)")
-        .bind(author_id).bind(title).bind(content).bind(files)
+        sqlx::query_as::<_, Post>("SELECT * FROM db_insert_post_with_files($1, $2, $3, $4, $5)")
+        .bind(author_id).bind(title).bind(content).bind(files).bind(tags)
         .fetch_one(&self.pool)
         .await
     }
@@ -99,10 +100,12 @@ impl Database {
 
     pub async fn get_posts_by_author(&self, author_id: i32, limit: i64) -> Result<Vec<Post>, sqlx::Error> {
         sqlx::query_as::<_, Post>("SELECT * FROM db_get_posts_by_author($1, $2)")
-        .bind(author_id).bind(limit)
+        .bind(author_id)
+        .bind(limit as i32)
         .fetch_all(&self.pool)
         .await
     }
+
 
     pub async fn get_latest_post_before(&self, time: NaiveDateTime) -> Result<Option<Post>, sqlx::Error> {
         sqlx::query_as::<_, Post>("SELECT * FROM db_get_latest_post_before($1)")

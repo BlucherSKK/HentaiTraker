@@ -55,16 +55,26 @@ function escMd(s: string): string { return s.replace(/&/g,'&amp;').replace(/</g,
 function escAttr(s: string): string { return s.replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 function escapeRegex(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
+// ----- tag validation — только [a-z_] -----
+
+const TAG_RE = /^[a-z_]+$/;
+const SUGGESTED_TAGS = ['hentai', 'art', 'discussion', 'video', 'music', 'games', 'news', 'fan_art', 'fan_fiction', 'review'];
+
+function isValidTag(t: string): boolean { return TAG_RE.test(t); }
+
 // ----- types -----
 
-interface PendingImage { file: File; localUrl: string; name: string; }
+interface PendingImage { file: File; localUrl: string; placeholder: string; }
+
+let _imgCounter = 0;
 
 // ----- PostCreatePage -----
 
 export class PostCreatePage extends HTMLElement {
     public ws: HntWsConnection | undefined;
 
-    private _images: PendingImage[] = [];
+    private _images: PendingImage[]   = [];
+    private _selectedTags: Set<string> = new Set(['any']);
     private _busy = false;
 
     connectedCallback() { this._attachStyles(); this.render(); }
@@ -76,17 +86,34 @@ export class PostCreatePage extends HTMLElement {
         <span class="pc-title">Новый пост</span>
         <button class="pc-cancel-btn" id="pc-cancel">Отмена</button>
         </div>
-        <input class="pc-input-title" id="pc-post-title" type="text" placeholder="Заголовок (необязательно)" maxlength="200">
+
+        <input class="pc-input-title" id="pc-post-title" type="text"
+        placeholder="Заголовок (необязательно)" maxlength="200">
+
+        <div class="pc-tags-section">
+        <span class="pc-tags-label">Теги <span class="pc-tags-hint">только a–z и _</span></span>
+        <div class="pc-tags-input-row">
+        <input class="pc-tag-input" id="pc-tag-input" type="text"
+        placeholder="введи тег и нажми Enter или ," maxlength="40" autocomplete="off">
+        <div class="pc-tag-suggestions" id="pc-tag-suggestions"></div>
+        </div>
+        <div class="pc-tags-selected" id="pc-tags-selected"></div>
+        <div class="pc-tag-error" id="pc-tag-error"></div>
+        </div>
+
         <div class="pc-editor-area">
         <div class="pc-drop-zone" id="pc-drop-zone">
-        <span class="pc-drop-hint">Перетащите картинку сюда — она добавится в список и загрузится при публикации</span>
+        <span class="pc-drop-hint">Перетащите картинку — плейсхолдер вставится в текст и заменится серверным именем при публикации</span>
         </div>
         <div class="pc-panes">
-        <textarea class="pc-textarea" id="pc-textarea" placeholder="## Заголовок&#10;- список&#10;- [ ] чеклист&#10;![alt](имя_файла.jpg)"></textarea>
+        <textarea class="pc-textarea" id="pc-textarea"
+        placeholder="## Заголовок&#10;- список&#10;- [ ] чеклист&#10;![alt](__img_0__)"></textarea>
         <div class="pc-preview" id="pc-preview"></div>
         </div>
         </div>
+
         <div class="pc-thumbs" id="pc-thumbs"></div>
+
         <div class="pc-footer">
         <div class="pc-progress-wrap" id="pc-progress-wrap" style="display:none">
         <div class="pc-progress-bar" id="pc-progress-bar"></div>
@@ -98,14 +125,18 @@ export class PostCreatePage extends HTMLElement {
         </div>
         </div>
         </div>`;
+
+        this._renderSelectedTags();
         this._bindEvents();
     }
 
     private _bindEvents() {
         this.querySelector('#pc-cancel')?.addEventListener('click', () => this._cancel());
         this.querySelector('#pc-submit')?.addEventListener('click', () => this._submit());
+
         const ta = this.querySelector<HTMLTextAreaElement>('#pc-textarea');
         ta?.addEventListener('input', () => this._updatePreview());
+
         const dz = this.querySelector<HTMLElement>('#pc-drop-zone');
         if (dz) {
             dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('pc-drop-over'); });
@@ -117,22 +148,150 @@ export class PostCreatePage extends HTMLElement {
                 if (file) this._addImage(file);
             });
         }
+
+        this._bindTagInput();
     }
 
-    private _updatePreview() {
-        const ta = this.querySelector<HTMLTextAreaElement>('#pc-textarea');
-        const preview = this.querySelector<HTMLElement>('#pc-preview');
-        if (ta && preview) preview.innerHTML = renderMarkdown(ta.value);
+    // ----- tags input -----
+
+    private _bindTagInput() {
+        const input = this.querySelector<HTMLInputElement>('#pc-tag-input');
+        if (!input) return;
+
+        input.addEventListener('input', () => {
+            this._clearTagError();
+            this._renderSuggestions(input.value.trim().toLowerCase());
+        });
+
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                this._commitTag(input.value);
+                input.value = '';
+                this._renderSuggestions('');
+            } else if (e.key === 'Backspace' && input.value === '') {
+                const last = [...this._selectedTags].filter(t => t !== 'any').pop();
+                if (last) { this._selectedTags.delete(last); this._renderSelectedTags(); }
+            }
+        });
+
+        input.addEventListener('blur', () => {
+            setTimeout(() => this._renderSuggestions(''), 150);
+        });
     }
+
+    private _commitTag(raw: string) {
+        const tag = raw.trim().toLowerCase().replace(/,/g, '');
+        if (!tag) return;
+
+        if (!isValidTag(tag)) {
+            this._setTagError(`«${tag}» — недопустимые символы. Только a–z и _`);
+            return;
+        }
+        if (this._selectedTags.has(tag)) return;
+
+        this._selectedTags.add(tag);
+        this._renderSelectedTags();
+        this._clearTagError();
+    }
+
+    private _renderSuggestions(query: string) {
+        const box = this.querySelector<HTMLElement>('#pc-tag-suggestions');
+        if (!box) return;
+
+        if (!query) { box.innerHTML = ''; box.style.display = 'none'; return; }
+
+        const matches = SUGGESTED_TAGS.filter(t =>
+        t.startsWith(query) && !this._selectedTags.has(t)
+        );
+
+        if (!matches.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+
+        box.style.display = '';
+        box.innerHTML = matches.map(t =>
+        `<button class="pc-suggestion" data-tag="${t}">${t}</button>`
+        ).join('');
+
+        box.querySelectorAll<HTMLButtonElement>('.pc-suggestion').forEach(btn => {
+            btn.addEventListener('mousedown', e => {
+                e.preventDefault();
+                const tag = btn.dataset.tag!;
+                this._selectedTags.add(tag);
+                this._renderSelectedTags();
+                const input = this.querySelector<HTMLInputElement>('#pc-tag-input');
+                if (input) { input.value = ''; }
+                box.innerHTML = ''; box.style.display = 'none';
+            });
+        });
+    }
+
+    private _renderSelectedTags() {
+        const sel = this.querySelector<HTMLElement>('#pc-tags-selected');
+        if (!sel) return;
+        sel.innerHTML = '';
+        for (const tag of this._selectedTags) {
+            const chip = document.createElement('span');
+            chip.className = `pc-tag-chip${tag === 'any' ? ' pc-tag-any' : ''}`;
+            chip.textContent = tag;
+            if (tag !== 'any') {
+                const rm = document.createElement('button');
+                rm.className   = 'pc-tag-rm';
+                rm.textContent = '✕';
+                rm.addEventListener('click', () => {
+                    this._selectedTags.delete(tag);
+                    this._renderSelectedTags();
+                });
+                chip.appendChild(rm);
+            }
+            sel.appendChild(chip);
+        }
+    }
+
+    private _setTagError(msg: string) {
+        const el = this.querySelector<HTMLElement>('#pc-tag-error');
+        if (el) el.textContent = msg;
+    }
+
+    private _clearTagError() {
+        const el = this.querySelector<HTMLElement>('#pc-tag-error');
+        if (el) el.textContent = '';
+    }
+
+    // ----- preview -----
+
+    private _updatePreview() {
+        const ta      = this.querySelector<HTMLTextAreaElement>('#pc-textarea');
+        const preview = this.querySelector<HTMLElement>('#pc-preview');
+        if (!ta || !preview) return;
+        let text = ta.value;
+        for (const img of this._images) {
+            text = text.replace(new RegExp(escapeRegex(img.placeholder), 'g'), img.localUrl);
+        }
+        preview.innerHTML = renderMarkdown(text);
+    }
+
+    // ----- images -----
 
     private _addImage(file: File) {
         const allowed = ['image/jpeg','image/png','image/gif','image/webp'];
         if (!allowed.includes(file.type)) { this._setStatus('Только jpg/png/gif/webp'); return; }
-        const localUrl = URL.createObjectURL(file);
-        const pending: PendingImage = { file, localUrl, name: file.name };
-        this._images.push(pending);
-        this._renderThumb(pending);
-        this._setStatus(`Добавлено: ${file.name}`);
+
+        const placeholder = `__img_${_imgCounter++}__`;
+        const localUrl    = URL.createObjectURL(file);
+        this._images.push({ file, localUrl, placeholder });
+
+        const ta = this.querySelector<HTMLTextAreaElement>('#pc-textarea');
+        if (ta) {
+            const insert = `![](${placeholder})`;
+            const start  = ta.selectionStart ?? ta.value.length;
+            const end    = ta.selectionEnd   ?? ta.value.length;
+            ta.value = ta.value.slice(0, start) + insert + ta.value.slice(end);
+            ta.selectionStart = ta.selectionEnd = start + insert.length;
+            this._updatePreview();
+        }
+
+        this._renderThumb({ file, localUrl, placeholder });
+        this._setStatus(`Добавлено: ${file.name} → ${placeholder}`);
     }
 
     private _renderThumb(img: PendingImage) {
@@ -140,15 +299,15 @@ export class PostCreatePage extends HTMLElement {
         if (!thumbs) return;
         const wrap = document.createElement('div');
         wrap.className = 'pc-thumb-wrap';
-        wrap.dataset.name = img.name;
         wrap.innerHTML = `
-        <img src="${img.localUrl}" class="pc-thumb-img" alt="${img.name}">
-        <span class="pc-thumb-name">${img.name}</span>
+        <img src="${img.localUrl}" class="pc-thumb-img" alt="${img.placeholder}">
+        <span class="pc-thumb-name">${img.placeholder}</span>
         <button class="pc-thumb-rm" title="Удалить">✕</button>`;
         wrap.querySelector('.pc-thumb-rm')?.addEventListener('click', () => {
-            this._images = this._images.filter(i => i.name !== img.name);
+            this._images = this._images.filter(i => i.placeholder !== img.placeholder);
             URL.revokeObjectURL(img.localUrl);
             wrap.remove();
+            this._updatePreview();
         });
         thumbs.appendChild(wrap);
     }
@@ -160,47 +319,49 @@ export class PostCreatePage extends HTMLElement {
         if (!this.ws) { this._setStatus('WS недоступен'); return; }
 
         const title   = (this.querySelector<HTMLInputElement>('#pc-post-title')?.value ?? '').trim();
-        const content = (this.querySelector<HTMLTextAreaElement>('#pc-textarea')?.value ?? '').trim();
+        const ta      = this.querySelector<HTMLTextAreaElement>('#pc-textarea');
+        const content = (ta?.value ?? '').trim();
         if (!content) { this._setStatus('Текст поста не может быть пустым'); return; }
+
+        const pendingInput = (this.querySelector<HTMLInputElement>('#pc-tag-input')?.value ?? '').trim();
+        if (pendingInput) this._commitTag(pendingInput);
 
         this._busy = true;
         this._setSubmitEnabled(false);
 
         const uploadedUrls: string[] = [];
         const total = this._images.length;
+        let   workingContent = content;
 
         try {
-            // ----- шаг 1: загружаем картинки -----
             for (let i = 0; i < total; i++) {
                 const img = this._images[i];
                 this._setProgress((i / (total + 1)) * 90, `Загрузка ${i + 1} из ${total}: ${img.file.name}`);
-
-                const filename = await this._uploadOne(img.file);
-                uploadedUrls.push(`/api/files/${filename}`);
-
-                const ta = this.querySelector<HTMLTextAreaElement>('#pc-textarea');
-                if (ta) {
-                    ta.value = ta.value.replace(new RegExp(escapeRegex(img.name), 'g'), filename);
-                    this._updatePreview();
-                }
+                const serverFilename = await this._uploadOne(img.file);
+                uploadedUrls.push(`/api/files/${serverFilename}`);
+                workingContent = workingContent.replace(
+                    new RegExp(escapeRegex(img.placeholder), 'g'),
+                                                        serverFilename
+                );
             }
 
-            // ----- шаг 2: создаём пост -----
             this._setProgress(95, 'Публикуем пост…');
-            const finalContent = (this.querySelector<HTMLTextAreaElement>('#pc-textarea')?.value ?? '').trim();
+
             const files = uploadedUrls.length > 0 ? JSON.stringify(uploadedUrls) : '';
+            const tags  = Array.from(this._selectedTags).join(',');
 
             await new Promise<void>((resolve, reject) => {
                 const offOk  = this.ws!.once('post_created', () => { offErr(); resolve(); });
                 const offErr = this.ws!.once('error', (_ev, p) => { offOk(); reject(new Error(String(p.code))); });
-                this.ws!.send('post_create', { title, content: finalContent, files })
+                this.ws!.send('post_create', { title, content: workingContent, files, tags })
                 .catch(e => { offOk(); offErr(); reject(e); });
             });
 
-            // ----- шаг 3: успех -----
             this._setProgress(100, 'Готово!');
             this._images.forEach(i => URL.revokeObjectURL(i.localUrl));
             this._images = [];
+            this._selectedTags.clear();
+            this._selectedTags.add('any');
             setTimeout(() => this._navigate('feeds'), 700);
 
         } catch (err) {
@@ -277,6 +438,23 @@ const POST_CREATE_STYLES = `
 .pc-cancel-btn { padding:6px 16px; cursor:pointer; background:transparent; border:1px solid var(--border); border-radius:4px; color:var(--textc); }
 .pc-cancel-btn:hover { background:var(--alt-bg); }
 .pc-input-title { width:100%; padding:10px; font-size:1rem; border:1px solid var(--border); border-radius:4px; background:var(--bgc); color:var(--textc); box-sizing:border-box; }
+
+.pc-tags-section { display:flex; flex-direction:column; gap:6px; padding:12px; background:var(--alt-bg); border:1px solid var(--border); border-radius:6px; }
+.pc-tags-label { font-size:0.9rem; font-weight:600; }
+.pc-tags-hint { font-size:0.75rem; font-weight:400; color:var(--ltextc); margin-left:6px; }
+.pc-tags-input-row { position:relative; }
+.pc-tag-input { width:100%; padding:7px 10px; font-size:0.9rem; border:1px solid var(--border); border-radius:4px; background:var(--bgc); color:var(--textc); box-sizing:border-box; }
+.pc-tag-input:focus { outline:none; border-color:var(--accentc); }
+.pc-tag-suggestions { position:absolute; top:100%; left:0; right:0; background:var(--bgc); border:1px solid var(--border); border-radius:0 0 4px 4px; z-index:10; display:none; }
+.pc-suggestion { display:block; width:100%; padding:6px 10px; text-align:left; background:transparent; border:none; color:var(--textc); cursor:pointer; font-size:0.9rem; }
+.pc-suggestion:hover { background:var(--alt-bg); }
+.pc-tags-selected { display:flex; flex-wrap:wrap; gap:6px; min-height:0; }
+.pc-tag-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; font-size:0.8rem; background:var(--bgc); border:1px solid var(--border); border-radius:20px; color:var(--textc); }
+.pc-tag-any { background:var(--accentc); color:#fff; border-color:var(--accentc); opacity:0.7; }
+.pc-tag-rm { background:transparent; border:none; color:inherit; cursor:pointer; font-size:0.75rem; line-height:1; padding:0; opacity:0.6; }
+.pc-tag-rm:hover { opacity:1; }
+.pc-tag-error { font-size:0.8rem; color:#e05; min-height:16px; }
+
 .pc-editor-area { display:flex; flex-direction:column; gap:8px; }
 .pc-drop-zone { border:2px dashed var(--border); border-radius:6px; padding:14px; text-align:center; color:var(--ltextc); font-size:0.9rem; transition:background 0.2s; cursor:default; }
 .pc-drop-zone.pc-drop-over { background:var(--alt-bg); border-color:var(--accentc); }

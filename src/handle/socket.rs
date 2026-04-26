@@ -148,8 +148,14 @@ pub fn ws(
                 async move { handlers::get_upload_token(sess, data, us).await }
             });
         }
+        router.on("post_create", |sess, data| async move {
+            handlers::post_create(sess, data).await
+        });
         router.on("chat_list", |sess, data| async move {
             handlers::chat_list(sess, data).await
+        });
+        router.on("user_posts", |sess, data| async move {
+            handlers::user_posts(sess, data).await
         });
 
         router.on("profile_get", |sess, data| async move {

@@ -267,13 +267,14 @@ CREATE OR REPLACE FUNCTION db_insert_post_with_files(
     p_author_id INT,
     p_title     TEXT,
     p_content   TEXT,
-    p_files     TEXT
+    p_files     TEXT,
+    p_tags      TEXT
 )
 RETURNS SETOF posts LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
-        INSERT INTO posts (title, content, files, author_id, time)
-        VALUES (p_title, p_content, p_files, p_author_id, NOW())
+        INSERT INTO posts (title, content, files, tags, author_id, time)
+        VALUES (p_title, p_content, p_files, p_tags, p_author_id, NOW())
         RETURNING *;
 END;
 $$;

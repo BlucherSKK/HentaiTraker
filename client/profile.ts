@@ -16,6 +16,17 @@ interface ProfileData {
     roles:  string | null;
 }
 
+interface PostItem {
+    id:        number;
+    title:     string | null;
+    content:   string;
+    tags:      string | null;
+    files:     string | null;
+    time:      string;
+}
+
+// ----- ProfilePage -----
+
 export class ProfilePage extends HTMLElement {
     private _ws?: HntWsConnection;
     user?: User;
@@ -34,11 +45,7 @@ export class ProfilePage extends HTMLElement {
     }
 
     private render() {
-        this.innerHTML = `
-        <div class="profile-page">
-        <p class="profile-loading">Загрузка профиля...</p>
-        </div>
-        `;
+        this.innerHTML = `<div class="profile-page"><p class="profile-loading">Загрузка профиля...</p></div>`;
     }
 
     private _loadProfile() {
@@ -54,9 +61,22 @@ export class ProfilePage extends HTMLElement {
                       roles:  (payload.roles ?? null) as string | null,
             };
             this._renderProfile();
+            this._loadPosts();
         });
 
         this._ws.send('profile_get', {}).catch(console.error);
+    }
+
+    private _loadPosts() {
+        if (!this._ws || !this._data) return;
+
+        this._ws.once('user_posts', (_ev, payload) => {
+            if (!this.isConnected) return;
+            const posts = (payload.posts ?? []) as PostItem[];
+            this._renderPosts(posts);
+        });
+
+        this._ws.send('user_posts', { limit: 50 }).catch(console.error);
     }
 
     private _renderProfile() {
@@ -68,11 +88,9 @@ export class ProfilePage extends HTMLElement {
 
         const tagsHtml = AVAILABLE_TAGS.map(tag => `
         <label class="profile-tag-label">
-        <input type="checkbox" class="tag-cb" value="${tag}"
-        ${currentTags.includes(tag) ? 'checked' : ''}>
+        <input type="checkbox" class="tag-cb" value="${tag}" ${currentTags.includes(tag) ? 'checked' : ''}>
         <span>${TAG_LABELS[tag]}</span>
-        </label>
-        `).join('');
+        </label>`).join('');
 
         const wrap = this.querySelector('.profile-page')!;
         wrap.innerHTML = `
@@ -92,24 +110,75 @@ export class ProfilePage extends HTMLElement {
         ${d.roles ? `<div class="profile-roles">${d.roles}</div>` : ''}
         </div>
         </div>
-
         <div class="profile-section">
         <h3 class="profile-section-title">Теги</h3>
         <div class="profile-tags-grid">${tagsHtml}</div>
         </div>
-
         <div class="profile-actions">
         <button class="profile-save-btn" id="save-btn">Сохранить</button>
         <span class="profile-status" id="profile-status"></span>
         </div>
         </div>
-        `;
+        <div class="profile-posts-section" id="profile-posts-section">
+        <div class="profile-posts-header">Мои посты</div>
+        <div class="profile-posts-list" id="profile-posts-list">
+        <span class="profile-posts-loading">Загрузка постов...</span>
+        </div>
+        </div>`;
 
+        this._bindProfileEvents();
+    }
+
+    private _renderPosts(posts: PostItem[]) {
+        const list = this.querySelector<HTMLElement>('#profile-posts-list');
+        if (!list) return;
+
+        if (!posts.length) {
+            list.innerHTML = `<span class="profile-posts-empty">Постов пока нет</span>`;
+            return;
+        }
+
+        list.innerHTML = posts.map(post => {
+            const tags = post.tags
+            ? post.tags.split(',').map(t => `<span class="pp-tag">${t.trim()}</span>`).join('')
+            : '';
+
+            let filesHtml = '';
+        if (post.files) {
+            try {
+                const urls: string[] = JSON.parse(post.files);
+                const imgs = urls.filter(u => /\.(jpg|jpeg|png|gif|webp)$/i.test(u));
+                if (imgs.length) {
+                    filesHtml = `<div class="pp-images">${
+                        imgs.map(u => `<img src="${u}" class="pp-thumb" loading="lazy">`).join('')
+                    }</div>`;
+                }
+            } catch { /* ignore */ }
+        }
+
+        const date = new Date(post.time).toLocaleDateString('ru-RU', {
+            day: '2-digit', month: 'short', year: 'numeric',
+        });
+
+        return `
+        <div class="pp-card">
+        <div class="pp-header">
+        <span class="pp-title">${escHtml(post.title || 'Без названия')}</span>
+        <span class="pp-date">${date}</span>
+        </div>
+        ${tags ? `<div class="pp-tags">${tags}</div>` : ''}
+        <p class="pp-content">${escHtml(post.content)}</p>
+        ${filesHtml}
+        </div>`;
+        }).join('');
+    }
+
+    private _bindProfileEvents() {
         this.querySelector('#avatar-btn')?.addEventListener('click', () => {
             (this.querySelector('#avatar-file') as HTMLInputElement)?.click();
         });
 
-        this.querySelector('#avatar-file')?.addEventListener('change', (e) => {
+        this.querySelector('#avatar-file')?.addEventListener('change', e => {
             const file = (e.target as HTMLInputElement).files?.[0];
             if (!file) return;
             const reader = new FileReader();
@@ -135,7 +204,7 @@ export class ProfilePage extends HTMLElement {
         btn.disabled = true;
 
         const checked = Array.from(this.querySelectorAll('.tag-cb:checked')) as HTMLInputElement[];
-        const tags = checked.map(el => el.value).join(',');
+        const tags    = checked.map(el => el.value).join(',');
 
         const payload: Record<string, unknown> = { tags };
         if (this._pendingAvatar) payload.avatar = this._pendingAvatar;
@@ -168,4 +237,8 @@ export class ProfilePage extends HTMLElement {
             if (this.isConnected) status.textContent = `Ошибка: ${err}`;
         });
     }
+}
+
+function escHtml(s: string): string {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
