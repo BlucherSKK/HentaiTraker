@@ -85,7 +85,7 @@ BEGIN
     );
     -- Дефолтная роль admin: все права [0,1,2,3,4,5]
     INSERT INTO roles (name, permissions)
-    VALUES ('admin', ARRAY[0,1,2,3,4,5])
+    VALUES ('admin', ARRAY[0,1,2,3,4,5,6])
     ON CONFLICT (name) DO NOTHING;
 END;
 $$ LANGUAGE plpgsql;

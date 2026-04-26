@@ -14,6 +14,7 @@ pub enum Permission {
     ManageUsers = 3,
     ManageRoles = 4,
     Ban         = 5,
+    Posting     = 6,
 }
 
 impl Permission {
@@ -25,6 +26,7 @@ impl Permission {
         Permission::ManageUsers,
         Permission::ManageRoles,
         Permission::Ban,
+        Permission::Posting,
     ];
 
     pub fn as_i32(self) -> i32 { self as i32 }
@@ -37,6 +39,7 @@ impl Permission {
             3 => Some(Self::ManageUsers),
             4 => Some(Self::ManageRoles),
             5 => Some(Self::Ban),
+            6 => Some(Self::Posting),
             _ => None,
         }
     }
@@ -50,6 +53,7 @@ impl Permission {
             Self::ManageUsers => "force_manage_users",
             Self::ManageRoles => "force_manage_roles",
             Self::Ban         => "force_ban",
+            Self::Posting     => "force_posting",
         }
     }
 }
