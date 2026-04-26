@@ -124,6 +124,22 @@ const CACHE_THRESHOLD: u64 = 5;
 const COUNTER_TTL:     u64 = 3_600;
 
 impl Store {
+
+    pub async fn user_has_permission(&self, user_id: i32, permission: i32) -> Result<bool, StoreError> {
+        Ok(self.db.user_has_permission(user_id, permission).await?)
+    }
+
+    pub async fn create_post(
+        &self,
+        author_id: i32,
+        title:     Option<&str>,
+        content:   &str,
+        files:     Option<&str>,
+    ) -> Result<Post, StoreError> {
+        Ok(self.db.insert_post_with_files(author_id, title, content, files).await?)
+    }
+
+
     pub async fn init(db_url: &str, redis_url: &str) -> Result<Self, StoreError> {
         let db    = Database::init(db_url).await.map_err(StoreError::Db)?;
         let cache = RedisClient::init(redis_url).map_err(StoreError::Redis)?;

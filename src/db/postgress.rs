@@ -83,6 +83,20 @@ impl Database {
 
     // ── Posts ─────────────────────────────────────────────────────────────────
 
+    pub async fn insert_post_with_files(
+        &self,
+        author_id: i32,
+        title:     Option<&str>,
+        content:   &str,
+        files:     Option<&str>,
+    ) -> Result<Post, sqlx::Error> {
+        sqlx::query_as::<_, Post>("SELECT * FROM db_insert_post_with_files($1, $2, $3, $4)")
+        .bind(author_id).bind(title).bind(content).bind(files)
+        .fetch_one(&self.pool)
+        .await
+    }
+
+
     pub async fn get_posts_by_author(&self, author_id: i32, limit: i64) -> Result<Vec<Post>, sqlx::Error> {
         sqlx::query_as::<_, Post>("SELECT * FROM db_get_posts_by_author($1, $2)")
         .bind(author_id).bind(limit)

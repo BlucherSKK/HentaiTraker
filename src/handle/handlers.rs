@@ -224,6 +224,68 @@ pub async fn chat_list(session: Arc<Mutex<Session>>, _data: Value) {
     }
 }
 
+
+// ----- post_create -----
+
+/// Payload: `{ title?: string, content: string, files?: string }`
+/// Ответ:   `{ event: "post_created", post: { id, title, content, files, author_id, time } }`
+pub async fn post_create(session: Arc<Mutex<Session>>, data: Value) {
+    let (store, user_id) = {
+        let s = session.lock().await;
+        (s.store.clone(), s.user_id)
+    };
+    let store   = match store   { Some(s) => s, None => return };
+    let user_id = match user_id { Some(id) => id, None => return };
+
+    let has_posting = match store.user_has_permission(user_id, 6).await {
+        Ok(v)  => v,
+        Err(e) => {
+            error!("post_create permission check: {e}");
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+            return;
+        }
+    };
+
+    if !has_posting {
+        let s = session.lock().await;
+        s.send_encrypted(&json!({ "event": "error", "code": "forbidden" })).await;
+        return;
+    }
+
+    let title   = data["title"].as_str().map(|s| s.trim()).filter(|s| !s.is_empty());
+    let content = data["content"].as_str().unwrap_or("").trim().to_string();
+    let files   = data["files"].as_str().filter(|s| !s.is_empty()).map(|s| s.to_string());
+
+    if content.is_empty() {
+        let s = session.lock().await;
+        s.send_encrypted(&json!({ "event": "error", "code": "empty_content" })).await;
+        return;
+    }
+
+    match store.create_post(user_id, title, &content, files.as_deref()).await {
+        Ok(post) => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({
+                "event": "post_created",
+                "post": {
+                    "id":        post.id,
+                    "title":     post.title,
+                    "content":   post.content,
+                    "files":     post.files,
+                    "author_id": post.author_id,
+                    "time":      post.time.to_string(),
+                }
+            })).await;
+        }
+        Err(e) => {
+            error!("post_create: {e}");
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+        }
+    }
+}
+
 // ─── message_create ───────────────────────────────────────────────────────────
 
 /// Payload: `{ chat_id: i32, content: string }`

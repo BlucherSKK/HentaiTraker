@@ -8,6 +8,7 @@ import { AppNav } from "./nav";
 import { HntWsConnection } from "./ws";
 import { ProfilePage } from "./profile";
 import { TerminalPage } from "./terminal";
+import { PostCreatePage } from "./post-create";
 
 declare global {
     interface Window {
@@ -29,7 +30,7 @@ export interface User {
     tagpool: Tags[];
 }
 
-type PageType = 'feeds' | 'projects' | 'settings' | 'login' | 'dm' | 'chats' | 'profile' | 'terminal';
+type PageType = 'feeds' | 'projects' | 'settings' | 'login' | 'dm' | 'chats' | 'profile' | 'terminal' | 'post-create';
 
 interface AppState {
     page: PageType;
@@ -48,6 +49,7 @@ customElements.define('app-chats', Chats);
 customElements.define('app-auth',  AuthPage);
 customElements.define('app-profile', ProfilePage);
 customElements.define('app-terminal', TerminalPage);
+customElements.define('post-create', PostCreatePage);
 
 const App = {
     state: {
@@ -195,6 +197,12 @@ const App = {
                 termElem.ws = this.state.ws;
             }
         }
+        if (this.state.page === 'post-create') {
+            const el = hero.querySelector('app-post-create') as PostCreatePage;
+            if (el) el.ws = this.state.ws;
+        }
+
+
     },
 
     // Создаём все страницы один раз, потом только скрываем/показываем
@@ -221,11 +229,22 @@ const App = {
             case 'login':    return `<app-auth></app-auth>`;
             case 'profile':  return `${nav}<app-profile></app-profile>`;
             case 'terminal': return `${nav}<app-terminal></app-terminal>`;
+            case 'post-create': return `${nav}<app-post-create></app-post-create>`;
             default:         return nav;
         }
     },
 
     initNavigation(): void {
+        window.addEventListener('app-navigate', (e: Event) => {
+            const detail = (e as CustomEvent).detail as { page: string };
+            const targetPage = detail.page as PageType;
+            if (targetPage && targetPage !== this.state.page) {
+                this.state.lastpage = this.state.page;
+                this.state.page     = targetPage;
+                history.pushState({ page: targetPage }, '', `/#${targetPage}`);
+                this.render();
+            }
+        });
         window.addEventListener('click', (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             const link   = target.closest<HTMLElement>('[data-link]');
@@ -247,13 +266,6 @@ const App = {
         });
     },
 
-    applyStyles(): void {
-        if (document.getElementById('app-styles')) return;
-        const style = document.createElement('style');
-        style.id          = 'app-styles';
-        style.textContent = STYLES;
-        document.head.appendChild(style);
-    },
 };
 
 App.init();
