@@ -12,7 +12,8 @@ BEGIN
         last_visit TIMESTAMP NOT NULL,
         roles      TEXT,
         avatar     TEXT,
-        tags       TEXT
+        tags       TEXT,
+        settings   TEXT
     );
 END;
 $$ LANGUAGE plpgsql;
@@ -74,6 +75,34 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION init_roles_table()
+RETURNS void AS $$
+BEGIN
+    CREATE TABLE IF NOT EXISTS roles (
+        id          SERIAL PRIMARY KEY,
+        name        TEXT NOT NULL UNIQUE,
+        permissions INTEGER[] NOT NULL DEFAULT '{}'  -- массив индексов Permission
+    );
+    -- Дефолтная роль admin: все права [0,1,2,3,4,5]
+    INSERT INTO roles (name, permissions)
+    VALUES ('admin', ARRAY[0,1,2,3,4,5])
+    ON CONFLICT (name) DO NOTHING;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION init_user_roles_cross_table()
+RETURNS void AS $$
+BEGIN
+    CREATE TABLE IF NOT EXISTS user_roles (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+        PRIMARY KEY (user_id, role_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles (user_id);
+END;
+$$ LANGUAGE plpgsql;
+
+
 CREATE OR REPLACE FUNCTION init_db_schema()
 RETURNS void AS $$
 BEGIN
@@ -82,6 +111,8 @@ BEGIN
     PERFORM init_chats_table();
     PERFORM init_cross_cher_members_table();
     PERFORM init_msg_table();
+    PERFORM init_roles_table();
+    PERFORM init_user_roles_cross_table();
 END;
 $$ LANGUAGE plpgsql;
 
@@ -113,6 +144,28 @@ BEGIN
     RETURN QUERY
         INSERT INTO users (name, pass, last_visit, roles)
         VALUES (p_name, p_pass, NOW(), p_roles)
+        RETURNING *;
+END;
+$$;
+
+-- ── Settings ─────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION db_get_settings(p_user_id INT)
+RETURNS TEXT LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    v_settings TEXT;
+BEGIN
+    SELECT settings INTO v_settings FROM users WHERE id = p_user_id;
+    RETURN v_settings;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION db_set_settings(p_user_id INT, p_settings TEXT)
+RETURNS SETOF users LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY
+        UPDATE users SET settings = p_settings
+        WHERE id = p_user_id
         RETURNING *;
 END;
 $$;
@@ -302,4 +355,70 @@ BEGIN
 END;
 $$;
 
+--  ----- roles функции
+
+CREATE OR REPLACE FUNCTION db_get_roles()
+RETURNS SETOF roles LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM roles;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION db_create_role(p_name TEXT, p_permissions INTEGER[])
+RETURNS SETOF roles LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY
+        INSERT INTO roles (name, permissions)
+        VALUES (p_name, p_permissions)
+        RETURNING *;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION db_get_user_roles(p_user_id INT)
+RETURNS SETOF roles LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    RETURN QUERY
+        SELECT r.* FROM roles r
+        JOIN user_roles ur ON ur.role_id = r.id
+        WHERE ur.user_id = p_user_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION db_assign_role(p_user_id INT, p_role_id INT)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO user_roles (user_id, role_id)
+    VALUES (p_user_id, p_role_id)
+    ON CONFLICT DO NOTHING;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION db_revoke_role(p_user_id INT, p_role_id INT)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    DELETE FROM user_roles WHERE user_id = p_user_id AND role_id = p_role_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION db_has_role(p_user_id INT, p_role_id INT)
+RETURNS BOOLEAN LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM user_roles WHERE user_id = p_user_id AND role_id = p_role_id
+    );
+END;
+$$;
+
+-- Проверка конкретного права через массив permissions
+CREATE OR REPLACE FUNCTION db_user_has_permission(p_user_id INT, p_permission INT)
+RETURNS BOOLEAN LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM roles r
+        JOIN user_roles ur ON ur.role_id = r.id
+        WHERE ur.user_id = p_user_id
+          AND p_permission = ANY(r.permissions)
+    );
+END;
+$$;
 

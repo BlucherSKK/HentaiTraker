@@ -2,6 +2,7 @@ use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::Executor;
 use std::time::Duration;
 use chrono::NaiveDateTime;
+use crate::db::roles::{Role, UserRole, init_roles};
 
 use crate::db::{User, Post, Chat, Message};
 
@@ -18,6 +19,7 @@ impl Database {
         .connect(url)
         .await?;
         pool.execute(include_str!("./db.sql")).await?;
+        init_roles(&pool).await?;
         Ok(Self { pool })
     }
 
@@ -112,6 +114,69 @@ impl Database {
         sqlx::query_as::<_, Post>("SELECT * FROM db_insert_post($1, $2, $3)")
         .bind(author_id).bind(title).bind(content)
         .fetch_one(&self.pool)
+        .await
+    }
+
+
+    // ── Roles ─────────────────────────────────────────────────────────────────
+
+    pub async fn get_roles(&self) -> Result<Vec<Role>, sqlx::Error> {
+        sqlx::query_as::<_, Role>("SELECT * FROM db_get_roles()")
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn create_role(&self, name: &str, permissions: &[i32]) -> Result<Role, sqlx::Error> {
+        sqlx::query_as::<_, Role>("SELECT * FROM db_create_role($1, $2)")
+        .bind(name).bind(permissions)
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    pub async fn get_user_roles(&self, user_id: i32) -> Result<Vec<Role>, sqlx::Error> {
+        sqlx::query_as::<_, Role>("SELECT * FROM db_get_user_roles($1)")
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn assign_role(&self, user_id: i32, role_id: i32) -> Result<(), sqlx::Error> {
+        sqlx::query("SELECT db_assign_role($1, $2)")
+        .bind(user_id).bind(role_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn revoke_role(&self, user_id: i32, role_id: i32) -> Result<(), sqlx::Error> {
+        sqlx::query("SELECT db_revoke_role($1, $2)")
+        .bind(user_id).bind(role_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn has_role(&self, user_id: i32, role_id: i32) -> Result<bool, sqlx::Error> {
+        let row: (bool,) = sqlx::query_as("SELECT db_has_role($1, $2)")
+        .bind(user_id).bind(role_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
+    pub async fn user_has_permission(&self, user_id: i32, permission: i32) -> Result<bool, sqlx::Error> {
+        let row: (bool,) = sqlx::query_as("SELECT db_user_has_permission($1, $2)")
+        .bind(user_id).bind(permission)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
+    // get_admin_role_id — для bootstrap
+    pub async fn get_role_by_name(&self, name: &str) -> Result<Option<Role>, sqlx::Error> {
+        sqlx::query_as::<_, Role>("SELECT * FROM roles WHERE name = $1")
+        .bind(name)
+        .fetch_optional(&self.pool)
         .await
     }
 

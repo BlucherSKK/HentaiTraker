@@ -2,6 +2,9 @@ use chrono::{NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
+pub mod roles;
+pub use roles::{Permission, Role, UserRole};
+
 pub mod postgress;
 pub mod redis;
 
@@ -25,6 +28,7 @@ pub struct User {
     pub roles: Option<String>,
     pub avatar: Option<String>,
     pub tags: Option<String>,
+    pub settings: Option<String>,
 }
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
