@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 
 use crate::secure;
 
-const TOKEN_TTL_SECS: u64  = 300;   // 5 минут на использование токена
+const TOKEN_TTL_SECS: u64  = 300;
 pub const UPLOADS_DIR: &str = "./uploads";
 
 // ─── Upload token store ───────────────────────────────────────────────────────
@@ -27,17 +27,14 @@ impl UploadTokenStore {
         Arc::new(Self { inner: RwLock::new(HashMap::new()) })
     }
 
-    /// Генерирует одноразовый токен для пользователя.
     pub async fn create_token(&self, user_id: i32) -> String {
         let token = secure::get_token(24);
         let mut map = self.inner.write().await;
-        // попутно чистим просроченные
         map.retain(|_, (_, issued)| issued.elapsed().as_secs() < TOKEN_TTL_SECS);
         map.insert(token.clone(), (user_id, Instant::now()));
         token
     }
 
-    /// Потребляет токен (одноразовый). Возвращает user_id или None если просрочен/не найден.
     pub async fn consume_token(&self, token: &str) -> Option<i32> {
         let mut map = self.inner.write().await;
         match map.remove(token) {
@@ -84,44 +81,63 @@ pub async fn upload(
         };
     }
 
-    // Валидируем токен
     if token_store.consume_token(&form.token).await.is_none() {
         err!(Status::Unauthorized, "invalid_or_expired_token");
     }
 
-    // Определяем расширение по Content-Type
     let ct = form.file.content_type().cloned().unwrap_or(ContentType::Binary);
     let ext = match allowed_ext(&ct) {
         Some(e) => e,
         None    => err!(Status::BadRequest, "unsupported_file_type"),
     };
 
-    // Уникальное имя файла
     let filename = format!("{}.{}", secure::get_token(16), ext);
     let dest     = Path::new(UPLOADS_DIR).join(&filename);
 
-    // Сохраняем на диск
-    if let Err(e) = form.file.persist_to(&dest).await {
-        error!("upload: persist_to failed: {e}");
+    // ----- копируем через tokio чтобы избежать cross-device link (os error 18) -----
+    let tmp_path = match form.file.path() {
+        Some(p) => p.to_path_buf(),
+        None    => err!(Status::InternalServerError, "no_temp_path"),
+    };
+
+    if let Err(e) = tokio::fs::copy(&tmp_path, &dest).await {
+        error!("upload: copy failed: {e}");
         err!(Status::InternalServerError, "save_failed");
     }
 
     let url = format!("/api/files/{filename}");
-    (Status::Ok, RawJson(json!({ "url": url }).to_string()))
+    (Status::Ok, RawJson(json!({ "url": url, "filename": filename }).to_string()))
 }
 
-// ─── GET /api/files/<name> ────────────────────────────────────────────────────
+// ─── DELETE /api/files/<n> ────────────────────────────────────────────────────
 
-#[get("/files/<name>")]
-pub async fn serve_file(name: &str) -> Option<NamedFile> {
-    // Защита от path traversal: только a-z A-Z 0-9 - _ и ровно одна точка
+#[rocket::delete("/files/<name>")]
+pub async fn delete_file(name: &str) -> Status {
     let dot_count = name.matches('.').count();
     let chars_ok  = name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
 
     if !chars_ok || dot_count != 1 || name.starts_with('.') {
-        return None;
+        return Status::BadRequest;
     }
 
     let path: PathBuf = [UPLOADS_DIR, name].iter().collect();
+    match tokio::fs::remove_file(&path).await {
+        Ok(_)  => Status::Ok,
+        Err(_) => Status::NotFound,
+    }
+}
+
+// ─── GET /api/files/<n> ───────────────────────────────────────────────────────
+
+#[get("/files/<n>")]
+pub async fn serve_file(n: &str) -> Option<NamedFile> {
+    let dot_count = n.matches('.').count();
+    let chars_ok  = n.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
+
+    if !chars_ok || dot_count != 1 || n.starts_with('.') {
+        return None;
+    }
+
+    let path: PathBuf = [UPLOADS_DIR, n].iter().collect();
     NamedFile::open(path).await.ok()
 }

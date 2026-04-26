@@ -119,21 +119,6 @@ async fn main() {
         .expect("Store init failed"),
     );
 
-    // Bootstrap: ensure user ID=1 always has the admin role (direct SQL, bypasses permission check)
-    if let Ok(Some(user)) = store.get_user(1).await {
-        let roles = user.roles.as_deref().unwrap_or("");
-        if !roles.split(',').any(|r| r.trim() == "admin") {
-            let new_roles = if roles.is_empty() {
-                "admin".to_string()
-            } else {
-                format!("{},admin", roles)
-            };
-            match store.set_roles_direct(1, &new_roles).await {
-                Ok(_)  => info!("пользователю ID=1 выдана роль admin"),
-                Err(e) => error!("bootstrap admin role: {e}"),
-            }
-        }
-    }
 
     let hnts = HntsState::new();
     hnts.start_auto_refresh(Duration::from_secs(15 * 60));
@@ -145,7 +130,7 @@ async fn main() {
     .manage(UploadTokenStore::new())
     .manage(admin::metric::ServerState::new())
     .mount("/",         routes![index, app_js, app_map, terminal_js])
-    .mount("/api",      routes![get_feed, upload::upload, upload::serve_file])
+    .mount("/api", routes![get_feed, upload::upload, upload::serve_file, upload::delete_file])
     .mount("/api/hnts", routes![hnts::get_token, handle::socket::ws])
     .launch()
     .await

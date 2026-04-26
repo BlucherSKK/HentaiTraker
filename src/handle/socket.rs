@@ -229,7 +229,7 @@ pub fn ws(
 
                             let login_result = async {
                                 let user = store.get_user_by_name(&username).await
-                                .map_err(|_| "db_error")?
+                                .map_err(|e| { error!("login get_user_by_name: {e}"); "db_error" })?
                                 .ok_or("user_not_found")?;
                                 if !secure::verify_password(&password, &user.pass) {
                                     return Err("wrong_password");

@@ -13,14 +13,13 @@ import { PostCreatePage } from "./post-create";
 declare global {
     interface Window {
         __VTNS__?: { pub_vtns: string; priv_vtns: string; ws: WebSocket; };
-        __MODULE_STYLES__?: Record<string, string>;  // ← новое
+        __MODULE_STYLES__?: Record<string, string>;
+        __TERMINAL_WS__?: HntWsConnection;
+        __TERMINAL_INIT__?: () => void;
     }
 }
 
-enum Tags {
-    Any,
-    Hentai
-}
+enum Tags { Any, Hentai }
 
 export interface User {
     name: string;
@@ -42,20 +41,24 @@ interface AppState {
     ws?: HntWsConnection;
 }
 
-customElements.define('app-feed',  Feed);
-customElements.define('home-nav',  HomeNav);
-customElements.define('app-nav',   AppNav);
-customElements.define('app-chats', Chats);
-customElements.define('app-auth',  AuthPage);
-customElements.define('app-profile', ProfilePage);
-customElements.define('app-terminal', TerminalPage);
-customElements.define('post-create', PostCreatePage);
+// ----- custom elements -----
+
+customElements.define('app-feed',         Feed);
+customElements.define('home-nav',         HomeNav);
+customElements.define('app-nav',          AppNav);
+customElements.define('app-chats',        Chats);
+customElements.define('app-auth',         AuthPage);
+customElements.define('app-profile',      ProfilePage);
+customElements.define('app-terminal',     TerminalPage);
+customElements.define('app-post-create',  PostCreatePage);
+
+// ----- App -----
 
 const App = {
     state: {
         page:     'feeds',
         lastpage: 'feeds',
-        items:    ['Разработка на Rust', 'Настройка Arch Linux', 'Docker контейнеры'],
+        items:    [],
         init:     false,
         db:       init_test_db(),
     } as AppState,
@@ -83,7 +86,6 @@ const App = {
     },
 
     applyStyles(): void {
-        // Основные стили приложения
         if (!document.getElementById('app-styles')) {
             const style = document.createElement('style');
             style.id          = 'app-styles';
@@ -91,7 +93,6 @@ const App = {
             document.head.appendChild(style);
         }
 
-        // Стили runtime-модулей (регистрируются через window.__MODULE_STYLES__)
         const moduleStyles = window.__MODULE_STYLES__ ?? {};
         for (const [moduleId, css] of Object.entries(moduleStyles)) {
             const styleId = `module-styles-${moduleId}`;
@@ -103,12 +104,10 @@ const App = {
         }
     },
 
-    // Добавить метод для регистрации стилей модулем в рантайме:
     registerModuleStyles(moduleId: string, css: string): void {
         window.__MODULE_STYLES__ = window.__MODULE_STYLES__ ?? {};
         window.__MODULE_STYLES__[moduleId] = css;
 
-        // Если applyStyles уже отработал — инжектируем сразу
         const styleId = `module-styles-${moduleId}`;
         if (!document.getElementById(styleId)) {
             const style = document.createElement('style');
@@ -127,7 +126,7 @@ const App = {
                 name:    payload.username as string,
                 id:      String(payload.user_id),
                 token:   payload.pub_at   as string,
-                roles: (payload.roles as string | null) ?? '',
+                roles:  (payload.roles as string | null) ?? '',
                 tagpool: [],
             };
             this.state.page = this.state.lastpage === 'login' ? 'feeds' : this.state.lastpage;
@@ -163,21 +162,19 @@ const App = {
         const hero = document.getElementById('apphero');
         if (!hero) return;
 
-        // При первом рендере создаём статичные страницы в DOM
         this.ensurePages(hero);
 
-        // Скрываем все страницы, показываем нужную
         hero.querySelectorAll<HTMLElement>(':scope > .page-slot').forEach(el => {
             el.style.display = el.dataset.page === this.state.page ? '' : 'none';
         });
 
-        // Обновляем nav во всех слотах
         hero.querySelectorAll<AppNav>('app-nav').forEach(nav => {
-            nav.setAttribute('data-link', this.state.page);
+            nav.setAttribute('data-link',       this.state.page);
             nav.setAttribute('data-user-roles', this.state.user?.roles || '');
         });
 
-        // Передаём зависимости компонентам
+        // ----- передача зависимостей -----
+
         if (this.state.page === 'chats') {
             const el = hero.querySelector('app-chats') as Chats;
             if (el) { el.db = this.state.db; el.render(); }
@@ -188,31 +185,30 @@ const App = {
         }
         if (this.state.page === 'login') {
             const el = hero.querySelector('app-auth') as AuthPage;
-            if (el) { el.ws = this.state.ws; }
+            if (el) el.ws = this.state.ws;
         }
         if (this.state.page === 'terminal') {
-            const termElem = root.querySelector('app-terminal') as TerminalPage;
-            if (termElem) {
+            const el = hero.querySelector('app-terminal') as TerminalPage;
+            if (el) {
                 window.__TERMINAL_WS__ = this.state.ws;
-                termElem.ws = this.state.ws;
+                el.ws = this.state.ws;
             }
         }
         if (this.state.page === 'post-create') {
             const el = hero.querySelector('app-post-create') as PostCreatePage;
             if (el) el.ws = this.state.ws;
         }
-
-
     },
 
-    // Создаём все страницы один раз, потом только скрываем/показываем
+    // ----- page slots -----
+
     ensurePages(hero: HTMLElement): void {
-        const pages: PageType[] = ['feeds', 'dm', 'chats', 'login', 'profile', 'terminal'];
+        const pages: PageType[] = ['feeds', 'dm', 'chats', 'login', 'profile', 'terminal', 'post-create'];
         for (const page of pages) {
             if (hero.querySelector(`[data-page="${page}"]`)) continue;
 
             const slot = document.createElement('div');
-            slot.className   = 'page-slot';
+            slot.className    = 'page-slot';
             slot.dataset.page = page;
             slot.style.display = 'none';
             slot.innerHTML = this.getPageTemplate(page);
@@ -223,16 +219,18 @@ const App = {
     getPageTemplate(page: PageType): string {
         const nav = `<app-nav data-link="${page}" data-user-roles="${this.state.user?.roles || ''}"></app-nav>`;
         switch (page) {
-            case 'feeds':    return `${nav}<app-feed></app-feed>`;
-            case 'dm':       return `${nav}${this.state.user ? '' : get_nonlogin_dm_noty()}`;
-            case 'chats':    return `${nav}<app-chats></app-chats>`;
-            case 'login':    return `<app-auth></app-auth>`;
-            case 'profile':  return `${nav}<app-profile></app-profile>`;
-            case 'terminal': return `${nav}<app-terminal></app-terminal>`;
+            case 'feeds':       return `${nav}<app-feed></app-feed>`;
+            case 'dm':          return `${nav}${this.state.user ? '' : get_nonlogin_dm_noty()}`;
+            case 'chats':       return `${nav}<app-chats></app-chats>`;
+            case 'login':       return `<app-auth></app-auth>`;
+            case 'profile':     return `${nav}<app-profile></app-profile>`;
+            case 'terminal':    return `${nav}<app-terminal></app-terminal>`;
             case 'post-create': return `${nav}<app-post-create></app-post-create>`;
-            default:         return nav;
+            default:            return nav;
         }
     },
+
+    // ----- navigation -----
 
     initNavigation(): void {
         window.addEventListener('app-navigate', (e: Event) => {
@@ -245,6 +243,7 @@ const App = {
                 this.render();
             }
         });
+
         window.addEventListener('click', (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             const link   = target.closest<HTMLElement>('[data-link]');
@@ -254,7 +253,7 @@ const App = {
                 if (targetPage && targetPage !== this.state.page) {
                     this.state.lastpage = this.state.page;
                     this.state.page     = targetPage;
-                    history.pushState({ page: targetPage }, "", `/#${targetPage}`);
+                    history.pushState({ page: targetPage }, '', `/#${targetPage}`);
                     this.render();
                 }
             }
@@ -265,7 +264,6 @@ const App = {
             this.render();
         });
     },
-
 };
 
 App.init();
