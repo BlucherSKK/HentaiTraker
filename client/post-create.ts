@@ -1,5 +1,6 @@
 // post-create.ts
 
+import { POST_CARD_STYLES, PostCardData, renderPostCard } from "./post-card";
 import { HntWsConnection } from "./ws";
 
 // ----- markdown renderer -----
@@ -118,16 +119,7 @@ export class PostCreatePage extends HTMLElement {
         </div>
 
         <div class="pc-feed-preview-label">Превью в ленте</div>
-        <div class="pc-feed-preview post-card" id="pc-feed-preview">
-        <div class="post-text">
-        <h2 id="pcfp-title" class="pcfp-title-placeholder">Без названия</h2>
-        <p class="post-text-body" id="pcfp-body"></p>
-        <div class="post-info">
-        <span style="color:var(--ltextc);font-size:0.8em">0 💬 &nbsp; 0 ❤️</span>
-        </div>
-        </div>
-        <div id="pcfp-img-wrap"></div>
-        </div>
+        <div id="pc-feed-preview"></div>
 
         <div class="pc-thumbs" id="pc-thumbs"></div>
 
@@ -280,32 +272,31 @@ export class PostCreatePage extends HTMLElement {
     // ----- feed card preview -----
 
     private _updateFeedPreview() {
+        const container = this.querySelector<HTMLElement>('#pc-feed-preview');
+        if (!container) return;
+
         const title   = (this.querySelector<HTMLInputElement>('#pc-post-title')?.value ?? '').trim();
         const ta      = this.querySelector<HTMLTextAreaElement>('#pc-textarea');
         const rawText = ta?.value ?? '';
 
-        const titleEl   = this.querySelector<HTMLElement>('#pcfp-title');
-        const bodyEl    = this.querySelector<HTMLElement>('#pcfp-body');
-        const imgWrap   = this.querySelector<HTMLElement>('#pcfp-img-wrap');
+        const plain = rawText
+        .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+        .replace(/#+\s*/g, '')
+        .trim();
 
-        if (titleEl) {
-            titleEl.textContent = title || 'Без названия';
-            titleEl.classList.toggle('pcfp-title-placeholder', !title);
-        }
+        const firstImg = this._images[0];
+        const fakeFiles = firstImg
+        ? JSON.stringify([firstImg.localUrl])
+        : null;
 
-        if (bodyEl) {
-            const plain = rawText.replace(/!\[[^\]]*\]\([^)]+\)/g, '').replace(/#+\s*/g, '').trim();
-            bodyEl.textContent = plain;
-        }
+        const post: PostCardData = {
+            title:   title || null,
+            content: plain,
+            files:   fakeFiles,
+            tags:    [...this._selectedTags].join(','),
+        };
 
-        if (imgWrap) {
-            const firstImg = this._images[0];
-            if (firstImg) {
-                imgWrap.innerHTML = `<img src="${firstImg.localUrl}" alt="" class="post-img">`;
-            } else {
-                imgWrap.innerHTML = '';
-            }
-        }
+        container.innerHTML = renderPostCard(post, 'preview');
     }
 
     // ----- images -----
@@ -477,6 +468,12 @@ export class PostCreatePage extends HTMLElement {
     }
 
     private _attachStyles() {
+        if (!document.getElementById('post-card-styles')) {
+            const s = document.createElement('style');
+            s.id = 'post-card-styles';
+            s.textContent = POST_CARD_STYLES;
+            document.head.appendChild(s);
+        }
         if (document.getElementById('post-create-styles')) return;
         const s = document.createElement('style');
         s.id = 'post-create-styles';

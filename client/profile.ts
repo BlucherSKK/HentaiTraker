@@ -1,4 +1,5 @@
 import { User } from "./app";
+import { bindPostCardClicks, PostCardData, renderPostCard } from "./post-card";
 import { HntWsConnection } from "./ws";
 
 const TAG_LABELS: Record<string, string> = {
@@ -138,39 +139,8 @@ export class ProfilePage extends HTMLElement {
             return;
         }
 
-        list.innerHTML = posts.map(post => {
-            const tags = post.tags
-            ? post.tags.split(',').map(t => `<span class="pp-tag">${t.trim()}</span>`).join('')
-            : '';
-
-            let filesHtml = '';
-        if (post.files) {
-            try {
-                const urls: string[] = JSON.parse(post.files);
-                const imgs = urls.filter(u => /\.(jpg|jpeg|png|gif|webp)$/i.test(u));
-                if (imgs.length) {
-                    filesHtml = `<div class="pp-images">${
-                        imgs.map(u => `<img src="${u}" class="pp-thumb" loading="lazy">`).join('')
-                    }</div>`;
-                }
-            } catch { /* ignore */ }
-        }
-
-        const date = new Date(post.time).toLocaleDateString('ru-RU', {
-            day: '2-digit', month: 'short', year: 'numeric',
-        });
-
-        return `
-        <div class="pp-card">
-        <div class="pp-header">
-        <span class="pp-title">${escHtml(post.title || 'Без названия')}</span>
-        <span class="pp-date">${date}</span>
-        </div>
-        ${tags ? `<div class="pp-tags">${tags}</div>` : ''}
-        <p class="pp-content">${escHtml(post.content)}</p>
-        ${filesHtml}
-        </div>`;
-        }).join('');
+        list.innerHTML = posts.map(post => renderPostCard(post as PostCardData, 'profile')).join('');
+        bindPostCardClicks(list);
     }
 
     private _bindProfileEvents() {

@@ -1,4 +1,5 @@
 import { SVG_COMMENT, SVG_LIKE } from "./assets";
+import { bindPostCardClicks, POST_CARD_STYLES, renderPostCard } from "./post-card";
 
 
 
@@ -30,11 +31,8 @@ export class HomeNav extends HTMLElement {
 
 
 export class Feed extends HTMLElement {
-    constructor() {
-        super();
-    }
-
     connectedCallback() {
+        this._injectStyles();
         this.render();
         this.fetchData();
     }
@@ -42,69 +40,39 @@ export class Feed extends HTMLElement {
     render(content?: string) {
         this.innerHTML = `
         <div id="container" class="feed">
-        ${content ? content : '<div class="loader-wrapper"><div class="loader"></div></div>'}
-        </div>
-        `;
+        ${content ?? '<div class="loader-wrapper"><div class="loader"></div></div>'}
+        </div>`;
     }
 
     async fetchData() {
-        const url = this.getAttribute('src') || "/api/getfeed";
-
+        const url = this.getAttribute('src') || '/api/getfeed';
         try {
             const response = await fetch(url);
-            const data = await response.json();
-
-            const posts = Array.isArray(data)
+            const data     = await response.json();
+            const posts    = Array.isArray(data)
             ? data
-            : (data.posts && Array.isArray(data.posts) ? data.posts : []);
+            : (Array.isArray(data.posts) ? data.posts : []);
 
-            if (posts.length === 0) {
-                this.render(`<span>Лента пуста или пришел неверный формат данных</span>`);
+            if (!posts.length) {
+                this.render('<span>Лента пуста или пришел неверный формат данных</span>');
                 return;
             }
 
-            const feedHtml = posts.map((post: any) => {
-                let files: string[] = [];
-                try { files = JSON.parse(post.files || '[]'); } catch { /* ignore */ }
-
-                const isImageUrl = (url: string) =>
-                url.startsWith('/api/files/') &&
-                /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(url);
-
-                const imagesHtml = files
-                .filter(isImageUrl)
-                .map(url => `<img src="${url}" alt="" class="post-img" loading="lazy">`)
-                .join('');
-
-                return `
-                <div class="post-card">
-                <div class="post-text">
-                <h2>${this.escapeHtml(post.title || 'Без названия')}</h2>
-                <p class="post-text-body">${this.escapeHtml(post.content || '')}</p>
-                <div class="post-info">
-                <img src="${SVG_COMMENT}" alt="Комменты">
-                <p>${this.escapeHtml(String(post.comment_count ?? '0'))}</p>
-                <img src="${SVG_LIKE}" alt="Лайки">
-                <p>${this.escapeHtml(String(post.like_count ?? '0'))}</p>
-                </div>
-                </div>
-                ${imagesHtml}
-                </div>
-                `;
-            }).join('');
-
+            const feedHtml = posts.map((post: any) => renderPostCard(post, 'feed')).join('');
             this.render(feedHtml);
-        } catch (err) {
-            this.render(`<span style="color: red;">Error: ${err}</span>`);
+
+            const container = this.querySelector<HTMLElement>('#container');
+            if (container) bindPostCardClicks(container);
+        } catch (e) {
+            this.render('<span>Ошибка загрузки ленты</span>');
         }
     }
 
-    private escapeHtml(unsafe: string) {
-        return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    private _injectStyles() {
+        if (document.getElementById('post-card-styles')) return;
+        const s = document.createElement('style');
+        s.id = 'post-card-styles';
+        s.textContent = POST_CARD_STYLES;
+        document.head.appendChild(s);
     }
 }
