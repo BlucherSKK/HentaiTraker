@@ -85,6 +85,14 @@ export class PostCreatePage extends HTMLElement {
 
     connectedCallback() { this._attachStyles(); this.render(); }
 
+    public reset() {
+        this._images.forEach(i => URL.revokeObjectURL(i.localUrl));
+        this._images       = [];
+        this._selectedTags = new Set(['any']);
+        this._busy         = false;
+        this.render();
+    }
+
     private render() {
         this.innerHTML = `
         <div class="pc-wrap">
@@ -341,6 +349,8 @@ export class PostCreatePage extends HTMLElement {
         thumbs.appendChild(wrap);
     }
 
+
+
     // ----- submit -----
 
     private async _submit() {
@@ -398,7 +408,9 @@ export class PostCreatePage extends HTMLElement {
             });
 
             this._setProgress(100, 'Готово!');
-            setTimeout(() => this._navigate('feeds'), 800);
+            setTimeout(() => {
+                this.reset();
+                this._navigate('feeds')}, 800);
         } catch (err: any) {
             this._setStatus(`Ошибка: ${err.message}`);
             this._busy = false;
@@ -434,6 +446,7 @@ export class PostCreatePage extends HTMLElement {
     }
 
     private async _cancel() {
+        this.reset();
         this._images.forEach(i => URL.revokeObjectURL(i.localUrl));
         this._images = [];
         this._navigate('feeds');

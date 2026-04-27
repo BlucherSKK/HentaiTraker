@@ -23,11 +23,17 @@ function escHtml(s: string): string {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i;
+
+function isImageUrl(u: string): boolean {
+    return u.startsWith('blob:') || IMAGE_EXT_RE.test(u);
+}
+
 function parseImages(files: string | null | undefined): string[] {
     if (!files) return [];
     try {
         const urls: string[] = JSON.parse(files);
-        return urls.filter(u => /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(u));
+        return urls.filter(isImageUrl).slice(0, 1);
     } catch { return []; }
 }
 
@@ -40,19 +46,19 @@ function formatDate(iso: string): string {
 // ----- renderPostCard -----
 
 export function renderPostCard(post: PostCardData, mode: PostCardMode): string {
-    const title    = escHtml(post.title || 'Без названия');
-    const content  = escHtml(post.content || '');
-    const images   = parseImages(post.files);
-    const date     = post.time ? formatDate(post.time) : '';
+    const title   = escHtml(post.title || 'Без названия');
+    const content = escHtml(post.content || '');
+    const images  = parseImages(post.files);
+    const date    = post.time ? formatDate(post.time) : '';
 
     const tagsHtml = post.tags
     ? post.tags.split(',').map(t => `<span class="pc-card-tag">${escHtml(t.trim())}</span>`).join('')
     : '';
 
-    const imagesHtml = images.length
-    ? `<div class="pc-card-images">${images.map(u =>
-        `<img src="${escHtml(u)}" class="pc-card-img" loading="lazy">`
-    ).join('')}</div>`
+    // ----- только первая картинка -----
+    const firstImage = images[0];
+    const imagesHtml = firstImage
+    ? `<div class="pc-card-images"><img src="${escHtml(firstImage)}" class="pc-card-img" loading="lazy"></div>`
     : '';
 
     const statsHtml = mode !== 'preview'
