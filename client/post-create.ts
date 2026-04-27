@@ -1,4 +1,6 @@
-import { HntWsConnection } from './ws';
+// post-create.ts
+
+import { HntWsConnection } from "./ws";
 
 // ----- markdown renderer -----
 
@@ -43,7 +45,10 @@ function renderMarkdown(raw: string): string {
 function inlineRender(text: string): string {
     return text
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
-        const url = src.startsWith('/') ? src : `/api/files/${escAttr(src)}`;
+        // ----- FIX: blob и абсолютные URL не оборачиваем в /api/files/ -----
+        const url = (src.startsWith('/') || src.startsWith('blob:') || src.startsWith('http'))
+        ? src
+        : `/api/files/${escAttr(src)}`;
         return `<img src="${url}" alt="${escAttr(alt)}" class="pc-inline-img">`;
     })
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) =>
@@ -51,11 +56,11 @@ function inlineRender(text: string): string {
     );
 }
 
-function escMd(s: string): string { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escMd(s: string): string   { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escAttr(s: string): string { return s.replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 function escapeRegex(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
-// ----- tag validation — только [a-z_] -----
+// ----- tag validation -----
 
 const TAG_RE = /^[a-z_]+$/;
 const SUGGESTED_TAGS = ['hentai', 'art', 'discussion', 'video', 'music', 'games', 'news', 'fan_art', 'fan_fiction', 'review'];
@@ -73,7 +78,7 @@ let _imgCounter = 0;
 export class PostCreatePage extends HTMLElement {
     public ws: HntWsConnection | undefined;
 
-    private _images: PendingImage[]   = [];
+    private _images: PendingImage[]    = [];
     private _selectedTags: Set<string> = new Set(['any']);
     private _busy = false;
 
@@ -112,6 +117,18 @@ export class PostCreatePage extends HTMLElement {
         </div>
         </div>
 
+        <div class="pc-feed-preview-label">Превью в ленте</div>
+        <div class="pc-feed-preview post-card" id="pc-feed-preview">
+        <div class="post-text">
+        <h2 id="pcfp-title" class="pcfp-title-placeholder">Без названия</h2>
+        <p class="post-text-body" id="pcfp-body"></p>
+        <div class="post-info">
+        <span style="color:var(--ltextc);font-size:0.8em">0 💬 &nbsp; 0 ❤️</span>
+        </div>
+        </div>
+        <div id="pcfp-img-wrap"></div>
+        </div>
+
         <div class="pc-thumbs" id="pc-thumbs"></div>
 
         <div class="pc-footer">
@@ -136,6 +153,9 @@ export class PostCreatePage extends HTMLElement {
 
         const ta = this.querySelector<HTMLTextAreaElement>('#pc-textarea');
         ta?.addEventListener('input', () => this._updatePreview());
+
+        const titleInput = this.querySelector<HTMLInputElement>('#pc-post-title');
+        titleInput?.addEventListener('input', () => this._updateFeedPreview());
 
         const dz = this.querySelector<HTMLElement>('#pc-drop-zone');
         if (dz) {
@@ -183,44 +203,27 @@ export class PostCreatePage extends HTMLElement {
     private _commitTag(raw: string) {
         const tag = raw.trim().toLowerCase().replace(/,/g, '');
         if (!tag) return;
-
-        if (!isValidTag(tag)) {
-            this._setTagError(`«${tag}» — недопустимые символы. Только a–z и _`);
-            return;
-        }
-        if (this._selectedTags.has(tag)) return;
-
+        if (!isValidTag(tag)) { this._setTagError(`«${tag}» — недопустимые символы.`); return; }
+        if (this._selectedTags.size >= 5) { this._setTagError('Максимум 5 тегов'); return; }
+        this._selectedTags.delete('any');
         this._selectedTags.add(tag);
         this._renderSelectedTags();
-        this._clearTagError();
     }
 
     private _renderSuggestions(query: string) {
         const box = this.querySelector<HTMLElement>('#pc-tag-suggestions');
         if (!box) return;
-
-        if (!query) { box.innerHTML = ''; box.style.display = 'none'; return; }
-
-        const matches = SUGGESTED_TAGS.filter(t =>
-        t.startsWith(query) && !this._selectedTags.has(t)
-        );
-
+        const matches = query ? SUGGESTED_TAGS.filter(t => t.startsWith(query) && !this._selectedTags.has(t)) : [];
         if (!matches.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
-
-        box.style.display = '';
-        box.innerHTML = matches.map(t =>
-        `<button class="pc-suggestion" data-tag="${t}">${t}</button>`
-        ).join('');
-
-        box.querySelectorAll<HTMLButtonElement>('.pc-suggestion').forEach(btn => {
-            btn.addEventListener('mousedown', e => {
+        box.style.display = 'block';
+        box.innerHTML = matches.map(t => `<div class="pc-tag-sug-item" data-tag="${t}">${t}</div>`).join('');
+        box.querySelectorAll<HTMLElement>('.pc-tag-sug-item').forEach(item => {
+            item.addEventListener('mousedown', e => {
                 e.preventDefault();
-                const tag = btn.dataset.tag!;
-                this._selectedTags.add(tag);
-                this._renderSelectedTags();
+                this._commitTag(item.dataset.tag ?? '');
                 const input = this.querySelector<HTMLInputElement>('#pc-tag-input');
                 if (input) { input.value = ''; }
-                box.innerHTML = ''; box.style.display = 'none';
+                this._renderSuggestions('');
             });
         });
     }
@@ -230,7 +233,7 @@ export class PostCreatePage extends HTMLElement {
         if (!sel) return;
         sel.innerHTML = '';
         for (const tag of this._selectedTags) {
-            const chip = document.createElement('span');
+            const chip = document.createElement('div');
             chip.className = `pc-tag-chip${tag === 'any' ? ' pc-tag-any' : ''}`;
             chip.textContent = tag;
             if (tag !== 'any') {
@@ -259,15 +262,50 @@ export class PostCreatePage extends HTMLElement {
 
     // ----- preview -----
 
-    private _updatePreview() {
-        const ta      = this.querySelector<HTMLTextAreaElement>('#pc-textarea');
-        const preview = this.querySelector<HTMLElement>('#pc-preview');
-        if (!ta || !preview) return;
-        let text = ta.value;
+    private _resolveText(): string {
+        const ta = this.querySelector<HTMLTextAreaElement>('#pc-textarea');
+        let text = ta?.value ?? '';
         for (const img of this._images) {
             text = text.replace(new RegExp(escapeRegex(img.placeholder), 'g'), img.localUrl);
         }
-        preview.innerHTML = renderMarkdown(text);
+        return text;
+    }
+
+    private _updatePreview() {
+        const preview = this.querySelector<HTMLElement>('#pc-preview');
+        if (preview) preview.innerHTML = renderMarkdown(this._resolveText());
+        this._updateFeedPreview();
+    }
+
+    // ----- feed card preview -----
+
+    private _updateFeedPreview() {
+        const title   = (this.querySelector<HTMLInputElement>('#pc-post-title')?.value ?? '').trim();
+        const ta      = this.querySelector<HTMLTextAreaElement>('#pc-textarea');
+        const rawText = ta?.value ?? '';
+
+        const titleEl   = this.querySelector<HTMLElement>('#pcfp-title');
+        const bodyEl    = this.querySelector<HTMLElement>('#pcfp-body');
+        const imgWrap   = this.querySelector<HTMLElement>('#pcfp-img-wrap');
+
+        if (titleEl) {
+            titleEl.textContent = title || 'Без названия';
+            titleEl.classList.toggle('pcfp-title-placeholder', !title);
+        }
+
+        if (bodyEl) {
+            const plain = rawText.replace(/!\[[^\]]*\]\([^)]+\)/g, '').replace(/#+\s*/g, '').trim();
+            bodyEl.textContent = plain;
+        }
+
+        if (imgWrap) {
+            const firstImg = this._images[0];
+            if (firstImg) {
+                imgWrap.innerHTML = `<img src="${firstImg.localUrl}" alt="" class="post-img">`;
+            } else {
+                imgWrap.innerHTML = '';
+            }
+        }
     }
 
     // ----- images -----
@@ -347,40 +385,39 @@ export class PostCreatePage extends HTMLElement {
 
             this._setProgress(95, 'Публикуем пост…');
 
-            const files = uploadedUrls.length > 0 ? JSON.stringify(uploadedUrls) : '';
-            const tags  = Array.from(this._selectedTags).join(',');
+            const files = uploadedUrls.length > 0 ? JSON.stringify(uploadedUrls) : undefined;
 
             await new Promise<void>((resolve, reject) => {
-                const offOk  = this.ws!.once('post_created', () => { offErr(); resolve(); });
-                const offErr = this.ws!.once('error', (_ev, p) => { offOk(); reject(new Error(String(p.code))); });
-                this.ws!.send('post_create', { title, content: workingContent, files, tags })
-                .catch(e => { offOk(); offErr(); reject(e); });
+                // ----- once() возвращает () => void (unsub), а не this -----
+                const unsub = this.ws!.once('post_created', () => {
+                    clearTimeout(timer);
+                    resolve();
+                });
+                const timer = setTimeout(() => {
+                    unsub();
+                    reject(new Error('timeout'));
+                }, 15_000);
+
+                this.ws!.send('create_post', {
+                    title,
+                    content: workingContent,
+                    files,
+                    tags: [...this._selectedTags].join(','),
+                }).catch(err => { clearTimeout(timer); unsub(); reject(err); });
             });
 
             this._setProgress(100, 'Готово!');
-            this._images.forEach(i => URL.revokeObjectURL(i.localUrl));
-            this._images = [];
-            this._selectedTags.clear();
-            this._selectedTags.add('any');
-            setTimeout(() => this._navigate('feeds'), 700);
-
-        } catch (err) {
-            this._setStatus(`Ошибка: ${err}`);
-            this._hideProgress();
-            this._setSubmitEnabled(true);
+            setTimeout(() => this._navigate('feeds'), 800);
+        } catch (err: any) {
+            this._setStatus(`Ошибка: ${err.message}`);
             this._busy = false;
+            this._setSubmitEnabled(true);
+            this._hideProgress();
         }
     }
 
     private async _uploadOne(file: File): Promise<string> {
-        if (!this.ws) throw new Error('no ws');
-        const token = await new Promise<string>((resolve, reject) => {
-            const off = this.ws!.once('upload_token', (_ev, p) => resolve(p.token as string));
-            this.ws!.send('get_upload_token').catch(e => { off(); reject(e); });
-            setTimeout(() => { off(); reject(new Error('token timeout')); }, 8000);
-        });
         const fd = new FormData();
-        fd.append('token', token);
         fd.append('file', file);
         const res  = await fetch('/api/upload', { method: 'POST', body: fd });
         const json = await res.json() as { filename?: string; error?: string };
@@ -482,4 +519,7 @@ const POST_CREATE_STYLES = `
 .pc-submit-btn { padding:8px 24px; background:var(--accentc); color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:1rem; }
 .pc-submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
 .pc-submit-btn:not(:disabled):hover { opacity:0.85; }
+.pc-feed-preview-label { font-size:0.8rem; font-weight:bold; color:var(--ltextc); text-transform:uppercase; letter-spacing:0.05em; margin-top:4px; }
+.pc-feed-preview { margin:0; cursor:default; pointer-events:none; }
+.pcfp-title-placeholder { color:var(--ltextc); font-style:italic; }
 `;

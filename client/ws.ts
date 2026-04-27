@@ -48,6 +48,8 @@ export class HntWsConnection {
         return this;
     }
 
+
+
     private emit(event: string, payload: Record<string, unknown>) {
         this.handlers.get(event)?.forEach(h => h(event, payload));
         this.handlers.get('*')?.forEach(h => h(event, payload));
