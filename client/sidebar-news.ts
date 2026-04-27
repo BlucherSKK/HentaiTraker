@@ -24,7 +24,7 @@ export class SidebarNews extends HTMLElement {
             const post: PostCardData | null = await res.json();
             if (!post) { this.render(''); return; }
 
-            const card = renderPostCard(post, 'feed');
+            const card = renderPostCard(post, 'sidebar');
             this.render(`
             <div class="sn-label">Новость</div>
             <div class="sn-card-wrap">${card}</div>`);

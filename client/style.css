@@ -312,8 +312,10 @@
 .feed {
     width: 40%;
     height: auto;
+    max-height: 59rem;
     margin: 0 auto;
     border: red solid;
+    overflow: scroll;
 }
 
 .header {

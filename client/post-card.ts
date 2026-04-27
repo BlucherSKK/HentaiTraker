@@ -15,7 +15,7 @@ export interface PostCardData {
     like_count?:    number;
 }
 
-export type PostCardMode = 'feed' | 'profile' | 'preview';
+export type PostCardMode = 'feed' | 'profile' | 'preview' | 'sidebar';
 
 // ----- helpers -----
 
@@ -61,7 +61,7 @@ export function renderPostCard(post: PostCardData, mode: PostCardMode): string {
     ? `<div class="pc-card-images"><img src="${escHtml(firstImage)}" class="pc-card-img" loading="lazy"></div>`
     : '';
 
-    const statsHtml = mode !== 'preview'
+    let statsHtml = mode !== 'preview'
     ? `<div class="pc-card-stats">
     <img src="${SVG_COMMENT}" alt="comments" class="pc-card-stat-icon">
     <span>${post.comment_count ?? 0}</span>
@@ -69,6 +69,8 @@ export function renderPostCard(post: PostCardData, mode: PostCardMode): string {
     <span>${post.like_count ?? 0}</span>
     </div>`
     : `<div class="pc-card-stats"><span style="color:var(--ltextc);font-size:0.8em">0 💬 &nbsp; 0 ❤️</span></div>`;
+
+    statsHtml = mode == 'sidebar' ? "" : statsHtml;
 
     const clickable = mode !== 'preview' && post.id != null;
 
@@ -80,7 +82,7 @@ export function renderPostCard(post: PostCardData, mode: PostCardMode): string {
     <h2 class="pc-card-title">${title}</h2>
     ${date ? `<span class="pc-card-date">${date}</span>` : ''}
     </div>
-    ${tagsHtml ? `<div class="pc-card-tags">${tagsHtml}</div>` : ''}
+    ${tagsHtml && mode !== 'sidebar' ? `<div class="pc-card-tags">${tagsHtml}</div>` : ''}
     <p class="pc-card-content post-text-body">${content}</p>
     ${statsHtml}
     </div>
