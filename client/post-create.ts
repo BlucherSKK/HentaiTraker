@@ -398,7 +398,7 @@ export class PostCreatePage extends HTMLElement {
                     reject(new Error('timeout'));
                 }, 15_000);
 
-                this.ws!.send('create_post', {
+                this.ws!.send('post_create', {
                     title,
                     content: workingContent,
                     files,
@@ -416,11 +416,28 @@ export class PostCreatePage extends HTMLElement {
         }
     }
 
+    private async _getUploadToken(): Promise<string> {
+        return new Promise<string>((resolve, reject) => {
+            const unsub = this.ws!.once('upload_token', (_ev, payload) => {
+                clearTimeout(timer);
+                resolve(payload.token as string);
+            });
+            const timer = setTimeout(() => { unsub(); reject(new Error('upload_token timeout')); }, 8_000);
+
+            this.ws!.send('get_upload_token', {})
+            .catch(err => { clearTimeout(timer); unsub(); reject(err); });
+        });
+    }
+
     private async _uploadOne(file: File): Promise<string> {
+        const token = await this._getUploadToken();
+
         const fd = new FormData();
-        fd.append('file', file);
+        fd.append('token', token);
+        fd.append('file',  file);
+
         const res  = await fetch('/api/upload', { method: 'POST', body: fd });
-        const json = await res.json() as { filename?: string; error?: string };
+        const json = await res.json() as { filename?: string; url?: string; error?: string };
         if (json.filename) return json.filename;
         throw new Error(json.error ?? 'upload failed');
     }
