@@ -3,3 +3,4 @@
 *.min.html
 *.js.map
 *.kate-swp
+/uploads
