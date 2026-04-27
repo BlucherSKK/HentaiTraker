@@ -198,6 +198,18 @@ impl Store {
 
     // ── Posts ─────────────────────────────────────────────────────────────────
 
+
+    pub async fn get_post_by_id(&self, id: i32) -> Result<Option<Post>, StoreError> {
+        let ck = format!("post:{id}");
+        if let Some(p) = Self::cache_get::<Post>(&self.cache, &ck).await { return Ok(Some(p)); }
+        let hits = self.cache.incr_counter(&format!("access:post:{id}"), COUNTER_TTL).await;
+        let post = self.db.get_post_by_id(id).await?;
+        if hits >= CACHE_THRESHOLD {
+            if let Some(ref p) = post { Self::cache_set(&self.cache, &ck, p, 300).await; }
+        }
+        Ok(post)
+    }
+
     pub async fn get_posts_by_author(&self, author_id: i32, limit: i64) -> Result<Vec<Post>, StoreError> {
         let ck = format!("posts:author:{author_id}:lim:{limit}");
         if let Some(p) = Self::cache_get::<Vec<Post>>(&self.cache, &ck).await { return Ok(p); }

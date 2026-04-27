@@ -9,6 +9,7 @@ use tokio::sync::RwLock;
 pub struct ServerState {
     inner: Arc<RwLock<Metrics>>,
     started_at: Instant,
+    pub sidebar_post_id: Arc<RwLock<Option<i32>>>,
 }
 
 struct Metrics {
@@ -44,7 +45,16 @@ impl ServerState {
         Self {
             inner:      Arc::new(RwLock::new(Metrics::new())),
             started_at: Instant::now(),
+             sidebar_post_id: Arc::new(RwLock::new(None)),
         }
+    }
+
+    pub async fn get_sidebar_post_id(&self) -> Option<i32> {
+        *self.sidebar_post_id.read().await
+    }
+
+    pub async fn set_sidebar_post_id(&self, id: i32) {
+        *self.sidebar_post_id.write().await = Some(id);
     }
 
     // ── соединения ──────────────────────────────────────────────────────────

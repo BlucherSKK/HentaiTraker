@@ -108,6 +108,20 @@
     color: var(--ltextc);
 }
 
+/* ----- feeds layout ----- */
+
+.feeds-layout {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    width: 100%;
+}
+
+.feeds-layout app-feed {
+    flex: 1;
+    min-width: 0;
+}
+
 .pp-content {
     font-size: 0.88em;
     color: var(--textc);

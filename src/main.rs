@@ -100,6 +100,23 @@ async fn get_feed(store: &State<Arc<Store>>) -> RawJson<String> {
         }
     }
 }
+use admin::metric;
+
+#[get("/sidebar-news")]
+async fn get_sidebar_news(
+    store:     &State<Arc<Store>>,
+    srv_state: &State<metric::ServerState>,
+) -> RawJson<String> {
+    let post_id = match srv_state.get_sidebar_post_id().await {
+        Some(id) => id,
+        None     => return RawJson("null".into()),
+    };
+
+    match store.get_post_by_id(post_id).await {
+        Ok(Some(post)) => RawJson(serde_json::to_string(&post).unwrap_or_else(|_| "null".into())),
+        _              => RawJson("null".into()),
+    }
+}
 
 #[rocket::main]
 async fn main() {
@@ -129,7 +146,7 @@ async fn main() {
     .manage(SessionRegistry::new())
     .manage(UploadTokenStore::new())
     .manage(admin::metric::ServerState::new())
-    .mount("/",         routes![index, app_js, app_map, terminal_js])
+    .mount("/",         routes![index, app_js, app_map, terminal_js, get_sidebar_news])
     .mount("/api", routes![get_feed, upload::upload, upload::serve_file, upload::delete_file])
     .mount("/api/hnts", routes![hnts::get_token, handle::socket::ws])
     .launch()

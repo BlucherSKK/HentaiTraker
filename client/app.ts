@@ -9,6 +9,7 @@ import { HntWsConnection } from "./ws";
 import { ProfilePage } from "./profile";
 import { TerminalPage } from "./terminal";
 import { PostCreatePage } from "./post-create";
+import { SidebarNews } from './sidebar-news';
 
 declare global {
     interface Window {
@@ -51,6 +52,7 @@ customElements.define('app-auth',         AuthPage);
 customElements.define('app-profile',      ProfilePage);
 customElements.define('app-terminal',     TerminalPage);
 customElements.define('app-post-create',  PostCreatePage);
+customElements.define('app-sidebar-news', SidebarNews);
 
 // ----- App -----
 
@@ -219,7 +221,12 @@ const App = {
     getPageTemplate(page: PageType): string {
         const nav = `<app-nav data-link="${page}" data-user-roles="${this.state.user?.roles || ''}"></app-nav>`;
         switch (page) {
-            case 'feeds':       return `${nav}<app-feed></app-feed>`;
+            case 'feeds': return `
+                ${nav}
+                <div class="feeds-layout">
+                <app-sidebar-news></app-sidebar-news>
+                <app-feed></app-feed>
+                </div>`;
             case 'dm':          return `${nav}${this.state.user ? '' : get_nonlogin_dm_noty()}`;
             case 'chats':       return `${nav}<app-chats></app-chats>`;
             case 'login':       return `<app-auth></app-auth>`;

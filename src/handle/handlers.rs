@@ -426,6 +426,7 @@ pub async fn get_upload_token(
     s.send_encrypted(&json!({ "event": "upload_token", "token": token })).await;
 }
 
+
 // ─── terminal_cmd ─────────────────────────────────────────────────────────────
 
 /// Payload: `{ input: string }`
@@ -453,8 +454,21 @@ pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value, srv_state: 
     };
 
     let output = admin::hnts_shell_exec(&input, srv_state.snapshot().await.format());
+
+    let final_output = if let Some(id_str) = output.strip_prefix("news:set:") {
+        match id_str.trim().parse::<i32>() {
+            Ok(post_id) => {
+                srv_state.set_sidebar_post_id(post_id).await;
+                format!("sidebar привязана к посту #{}", post_id)
+            }
+            Err(_) => "ошибка парсинга id".into(),
+        }
+    } else {
+        output
+    };
+
     let s = session.lock().await;
-    s.send_encrypted(&json!({ "event": "terminal_output", "output": output })).await;
+    s.send_encrypted(&json!({ "event": "terminal_output", "output": final_output })).await;
 }
 
 

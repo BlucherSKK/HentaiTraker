@@ -134,6 +134,13 @@ impl Database {
         .await
     }
 
+    pub async fn get_post_by_id(&self, id: i32) -> Result<Option<Post>, sqlx::Error> {
+        sqlx::query_as::<_, Post>("SELECT * FROM posts WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
 
     // ── Roles ─────────────────────────────────────────────────────────────────
 
