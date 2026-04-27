@@ -3,10 +3,17 @@ import { bindPostCardClicks, POST_CARD_STYLES, PostCardData, renderPostCard } fr
 // ----- SidebarNews -----
 
 export class SidebarNews extends HTMLElement {
+    private _boundRefresh = () => this.fetchData();
+
     connectedCallback() {
         this._injectStyles();
         this.render();
         this.fetchData();
+        window.addEventListener('feed-refresh', this._boundRefresh);
+    }
+
+    disconnectedCallback() {
+        window.removeEventListener('feed-refresh', this._boundRefresh);
     }
 
     render(content?: string) {

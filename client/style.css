@@ -318,6 +318,20 @@
     overflow: scroll;
 }
 
+/* ----- nav refresh btn ----- */
+
+.nav-refresh-btn {
+    transition: transform 0.4s;
+}
+
+.nav-refresh-btn:hover {
+    transform: rotate(180deg);
+}
+
+.nav-refresh-btn:active {
+    transform: rotate(360deg);
+}
+
 .header {
     background: linear-gradient(black, darkolivegreen);
     border-bottom: 10px darkorchid ridge;

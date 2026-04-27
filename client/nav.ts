@@ -1,4 +1,3 @@
-
 export class AppNav extends HTMLElement {
 
     static get observedAttributes() {
@@ -9,7 +8,19 @@ export class AppNav extends HTMLElement {
         if (oldValue !== newValue) this.render();
     }
 
-    connectedCallback() { this.render(); }
+    connectedCallback() {
+        this.render();
+        this._bindRefresh();
+    }
+
+    // ----- refresh -----
+
+
+    private _bindRefresh() {
+        this.querySelector('#nav-refresh-btn')?.addEventListener('click', () => {
+            window.dispatchEvent(new CustomEvent('feed-refresh'));
+        });
+    }
 
     render() {
         const rolesStr = this.getAttribute('data-user-roles') || '';
@@ -27,9 +38,12 @@ export class AppNav extends HTMLElement {
         ${btn('dm',    'личка')}
         ${btn('chats', 'чаты')}
         ${btn('feeds', 'лента')}
-        ${canPost ? btn('post-create', '+ пост') : ''}
-        </div>
+        ${canPost && page == 'feeds' ? btn('post-create', '+ пост') : ''}
+        ${ page == 'feeds' ? `<button class="nav-btn nav-refresh-btn" id="nav-refresh-btn" title="Обновить ленту">↻</button>
+        </div>` : ""}
         ${isAdmin ? `<div class="nav-right">${btn('terminal', 'терминал')}</div>` : ''}
         </div>`;
+
+        this._bindRefresh();
     }
 }
