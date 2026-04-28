@@ -345,6 +345,12 @@ fn validate_tags(raw: &str) -> String {
     tags.join(",")
 }
 
+// ----- utils -----
+
+fn strip_nulls(s: &str) -> String {
+    s.replace('\0', "")
+}
+
 /// Payload: `{ title?: string, content: string, files?: string }`
 /// Ответ:   `{ event: "post_created", post: { id, title, content, files, author_id, time } }`
 pub async fn post_create(session: Arc<Mutex<Session>>, data: Value) {
@@ -371,18 +377,19 @@ pub async fn post_create(session: Arc<Mutex<Session>>, data: Value) {
         return;
     }
 
-    let title   = data["title"].as_str().map(|s| s.trim()).filter(|s| !s.is_empty());
-    let content = data["content"].as_str().unwrap_or("").trim().to_string();
-    let files   = data["files"].as_str().filter(|s| !s.is_empty()).map(|s| s.to_string());
-    let tags    = validate_tags(data["tags"].as_str().unwrap_or(""));
+    let title_s   = data["title"].as_str()
+    .filter(|s| !s.is_empty())
+    .map(strip_nulls);
+    let content_s = strip_nulls(data["content"].as_str().unwrap_or("").trim());
+    let tags_s    = strip_nulls(&validate_tags(data["tags"].as_str().unwrap_or("")));
 
-    if content.is_empty() {
+    if content_s.is_empty() {
         let s = session.lock().await;
         s.send_encrypted(&json!({ "event": "error", "code": "empty_content" })).await;
         return;
     }
 
-    match store.create_post(user_id, title, &content, Some(tags.as_str())).await {
+    match store.create_post(user_id, title_s.as_deref(), &content_s, Some(&tags_s)).await {
         Ok(post) => {
             let s = session.lock().await;
             s.send_encrypted(&json!({
