@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 pub mod roles;
-pub use roles::{Permission, Role, UserRole};
+pub use roles::{Permission, Role};
 
 pub mod postgress;
 pub mod redis;
@@ -95,13 +95,16 @@ pub enum StoreError {
     Unauthorized
 }
 
+// ----- error -----
+
 impl std::fmt::Display for StoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StoreError::Db(e)    => write!(f, "db: {e}"),
-            StoreError::Redis(e) => write!(f, "redis init: {e}"),
-            StoreError::Json(e)  => write!(f, "json: {e}"),
-            StoreError::NotFound => write!(f, "not found"),
+            StoreError::Db(e)       => write!(f, "db: {e}"),
+            StoreError::Redis(e)    => write!(f, "redis init: {e}"),
+            StoreError::Json(e)     => write!(f, "json: {e}"),
+            StoreError::NotFound    => write!(f, "not found"),
+            StoreError::Unauthorized => write!(f, "unauthorized"),
         }
     }
 }
@@ -120,6 +123,7 @@ pub struct Store {
 
 const CACHE_THRESHOLD: u64 = 5;
 const COUNTER_TTL:     u64 = 3_600;
+
 
 impl Store {
     pub async fn init(db_url: &str, redis_url: &str) -> Result<Self, StoreError> {
@@ -229,6 +233,10 @@ impl Store {
 
     // ----- posts -----
 
+    pub async fn get_post_by_id(&self, post_id: i32) -> Result<Option<Post>, StoreError> {
+        Ok(self.db.get_post_by_id(post_id).await?)
+    }
+
     pub async fn create_post(&self, author_id: i32, title: Option<&str>, content: &str, tags: Option<&str>) -> Result<Post, StoreError> {
         Ok(self.db.create_post(author_id, title, content, tags).await?)
     }
@@ -253,6 +261,15 @@ impl Store {
 
     pub async fn add_chat_member(&self, chat_id: i32, member_id: i32) -> Result<(), StoreError> {
         Ok(self.db.add_chat_member(chat_id, member_id).await?)
+    }
+
+    // ----- chats -----
+
+    pub async fn join_chat(&self, chat_id: i32, user_id: i32) -> Result<Chat, StoreError> {
+        let chat = self.db.get_chat_by_id(chat_id).await?
+        .ok_or(StoreError::NotFound)?;
+        self.db.add_chat_member(chat_id, user_id).await?;
+        Ok(chat)
     }
 
     // ----- messages -----

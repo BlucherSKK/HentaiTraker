@@ -140,6 +140,13 @@ impl Database {
 
     // ----- posts -----
 
+    pub async fn get_post_by_id(&self, id: i32) -> Result<Option<Post>, sqlx::Error> {
+        sqlx::query_as::<_, Post>("SELECT * FROM posts WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
     pub async fn create_post(&self, author_id: i32, title: Option<&str>, content: &str, tags: Option<&str>) -> Result<Post, sqlx::Error> {
         sqlx::query_as::<_, Post>("SELECT * FROM db_create_post($1, $2, $3, $4)")
         .bind(author_id).bind(title).bind(content).bind(tags)
@@ -162,6 +169,14 @@ impl Database {
     }
 
     // ----- chats -----
+
+
+    pub async fn get_chat_by_id(&self, id: i32) -> Result<Option<Chat>, sqlx::Error> {
+        sqlx::query_as::<_, Chat>("SELECT * FROM chats WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+    }
 
     pub async fn get_user_chats(&self, member_id: i32) -> Result<Vec<Chat>, sqlx::Error> {
         sqlx::query_as::<_, Chat>("SELECT * FROM db_get_user_chats($1)")
