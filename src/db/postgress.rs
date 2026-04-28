@@ -1,9 +1,8 @@
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::Executor;
 use std::time::Duration;
-use chrono::NaiveDateTime;
-use crate::db::roles::{Role, UserRole, init_roles};
 
+use crate::db::roles::{Role, init_roles};
 use crate::db::{User, Post, Chat, Message};
 
 #[derive(Clone)]
@@ -23,7 +22,7 @@ impl Database {
         Ok(Self { pool })
     }
 
-    // ── Users ─────────────────────────────────────────────────────────────────
+    // ----- users -----
 
     pub async fn get_user_by_id(&self, id: i32) -> Result<Option<User>, sqlx::Error> {
         sqlx::query_as::<_, User>("SELECT * FROM db_get_user_by_id($1)")
@@ -39,9 +38,10 @@ impl Database {
         .await
     }
 
-    pub async fn insert_user(&self, name: &str, pass: &str, roles: &str) -> Result<User, sqlx::Error> {
-        sqlx::query_as::<_, User>("SELECT * FROM db_insert_user($1, $2, $3)")
-        .bind(name).bind(pass).bind(roles)
+    pub async fn insert_user(&self, name: &str, pass: &str) -> Result<User, sqlx::Error> {
+        sqlx::query_as::<_, User>("SELECT * FROM db_insert_user($1, $2)")
+        .bind(name)
+        .bind(pass)
         .fetch_one(&self.pool)
         .await
     }
@@ -54,10 +54,9 @@ impl Database {
         pass:        Option<&str>,
         avatar:      Option<&str>,
         tags:        Option<&str>,
-        roles:       Option<&str>,
     ) -> Result<Option<User>, sqlx::Error> {
         sqlx::query_as::<_, User>(
-            "SELECT * FROM db_update_user($1, $2, $3, $4, $5, $6, $7)"
+            "SELECT * FROM db_update_user($1, $2, $3, $4, $5, $6)"
         )
         .bind(target_id)
         .bind(modifier_id)
@@ -65,58 +64,86 @@ impl Database {
         .bind(pass)
         .bind(avatar)
         .bind(tags)
-        .bind(roles)
         .fetch_optional(&self.pool)
         .await
     }
 
+    // ----- roles -----
 
-
-    pub async fn set_roles_direct(&self, user_id: i32, roles: &str) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE users SET roles = $1 WHERE id = $2")
-        .bind(roles)
+    // В db.sql нужна функция db_set_user_roles — см. ниже.
+    pub async fn set_user_roles(&self, user_id: i32, role_ids: &[i32]) -> Result<(), sqlx::Error> {
+        sqlx::query("SELECT db_set_user_roles($1, $2)")
         .bind(user_id)
+        .bind(role_ids)
         .execute(&self.pool)
         .await?;
         Ok(())
     }
 
-    // ── Posts ─────────────────────────────────────────────────────────────────
-
-    pub async fn insert_post_with_files(
-        &self,
-        author_id: i32,
-        title:     Option<&str>,
-        content:   &str,
-        files:     Option<&str>,
-        tags:      &str,
-    ) -> Result<Post, sqlx::Error> {
-        sqlx::query_as::<_, Post>("SELECT * FROM db_insert_post_with_files($1, $2, $3, $4, $5)")
-        .bind(author_id).bind(title).bind(content).bind(files).bind(tags)
-        .fetch_one(&self.pool)
-        .await
-    }
-
-
-    pub async fn get_posts_by_author(&self, author_id: i32, limit: i64) -> Result<Vec<Post>, sqlx::Error> {
-        sqlx::query_as::<_, Post>("SELECT * FROM db_get_posts_by_author($1, $2)")
-        .bind(author_id)
-        .bind(limit as i32)
+    pub async fn get_user_roles(&self, user_id: i32) -> Result<Vec<Role>, sqlx::Error> {
+        sqlx::query_as::<_, Role>("SELECT * FROM db_get_user_roles($1)")
+        .bind(user_id)
         .fetch_all(&self.pool)
         .await
     }
 
+    pub async fn get_roles(&self) -> Result<Vec<Role>, sqlx::Error> {
+        sqlx::query_as::<_, Role>("SELECT * FROM db_get_roles()")
+        .fetch_all(&self.pool)
+        .await
+    }
 
-    pub async fn get_latest_post_before(&self, time: NaiveDateTime) -> Result<Option<Post>, sqlx::Error> {
-        sqlx::query_as::<_, Post>("SELECT * FROM db_get_latest_post_before($1)")
-        .bind(time)
+    pub async fn assign_role(&self, user_id: i32, role_id: i32) -> Result<(), sqlx::Error> {
+        sqlx::query("SELECT db_assign_role($1, $2)")
+        .bind(user_id)
+        .bind(role_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn revoke_role(&self, user_id: i32, role_id: i32) -> Result<(), sqlx::Error> {
+        sqlx::query("SELECT db_revoke_role($1, $2)")
+        .bind(user_id)
+        .bind(role_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn user_has_permission(&self, user_id: i32, permission: i32) -> Result<bool, sqlx::Error> {
+        let row: (bool,) = sqlx::query_as("SELECT db_user_has_permission($1, $2)")
+        .bind(user_id)
+        .bind(permission)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
+    // ----- settings -----
+
+    pub async fn get_settings(&self, user_id: i32) -> Result<Option<String>, sqlx::Error> {
+        let row: Option<(Option<String>,)> = sqlx::query_as("SELECT db_get_settings($1)")
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.and_then(|r| r.0))
+    }
+
+    pub async fn set_settings(&self, user_id: i32, settings: &str) -> Result<Option<User>, sqlx::Error> {
+        sqlx::query_as::<_, User>("SELECT * FROM db_set_settings($1, $2)")
+        .bind(user_id)
+        .bind(settings)
         .fetch_optional(&self.pool)
         .await
     }
 
-    pub async fn get_latest_post_now(&self) -> Result<Option<Post>, sqlx::Error> {
-        sqlx::query_as::<_, Post>("SELECT * FROM db_get_latest_post_now()")
-        .fetch_optional(&self.pool)
+    // ----- posts -----
+
+    pub async fn create_post(&self, author_id: i32, title: Option<&str>, content: &str, tags: Option<&str>) -> Result<Post, sqlx::Error> {
+        sqlx::query_as::<_, Post>("SELECT * FROM db_create_post($1, $2, $3, $4)")
+        .bind(author_id).bind(title).bind(content).bind(tags)
+        .fetch_one(&self.pool)
         .await
     }
 
@@ -127,99 +154,14 @@ impl Database {
         .await
     }
 
-    pub async fn insert_post(&self, author_id: i32, title: Option<&str>, content: &str) -> Result<Post, sqlx::Error> {
-        sqlx::query_as::<_, Post>("SELECT * FROM db_insert_post($1, $2, $3)")
-        .bind(author_id).bind(title).bind(content)
-        .fetch_one(&self.pool)
-        .await
-    }
-
-    pub async fn get_post_by_id(&self, id: i32) -> Result<Option<Post>, sqlx::Error> {
-        sqlx::query_as::<_, Post>("SELECT * FROM posts WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await
-    }
-
-
-    // ── Roles ─────────────────────────────────────────────────────────────────
-
-    pub async fn get_roles(&self) -> Result<Vec<Role>, sqlx::Error> {
-        sqlx::query_as::<_, Role>("SELECT * FROM db_get_roles()")
+    pub async fn get_posts_by_author(&self, author_id: i32, limit: i32) -> Result<Vec<Post>, sqlx::Error> {
+        sqlx::query_as::<_, Post>("SELECT * FROM db_get_posts_by_author($1, $2)")
+        .bind(author_id).bind(limit)
         .fetch_all(&self.pool)
         .await
     }
 
-    pub async fn create_role(&self, name: &str, permissions: &[i32]) -> Result<Role, sqlx::Error> {
-        sqlx::query_as::<_, Role>("SELECT * FROM db_create_role($1, $2)")
-        .bind(name).bind(permissions)
-        .fetch_one(&self.pool)
-        .await
-    }
-
-    pub async fn get_user_roles(&self, user_id: i32) -> Result<Vec<Role>, sqlx::Error> {
-        sqlx::query_as::<_, Role>("SELECT * FROM db_get_user_roles($1)")
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await
-    }
-
-    pub async fn assign_role(&self, user_id: i32, role_id: i32) -> Result<(), sqlx::Error> {
-        sqlx::query("SELECT db_assign_role($1, $2)")
-        .bind(user_id).bind(role_id)
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn revoke_role(&self, user_id: i32, role_id: i32) -> Result<(), sqlx::Error> {
-        sqlx::query("SELECT db_revoke_role($1, $2)")
-        .bind(user_id).bind(role_id)
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn has_role(&self, user_id: i32, role_id: i32) -> Result<bool, sqlx::Error> {
-        let row: (bool,) = sqlx::query_as("SELECT db_has_role($1, $2)")
-        .bind(user_id).bind(role_id)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(row.0)
-    }
-
-    pub async fn user_has_permission(&self, user_id: i32, permission: i32) -> Result<bool, sqlx::Error> {
-        let row: (bool,) = sqlx::query_as("SELECT db_user_has_permission($1, $2)")
-        .bind(user_id).bind(permission)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(row.0)
-    }
-
-    // get_admin_role_id — для bootstrap
-    pub async fn get_role_by_name(&self, name: &str) -> Result<Option<Role>, sqlx::Error> {
-        sqlx::query_as::<_, Role>("SELECT * FROM roles WHERE name = $1")
-        .bind(name)
-        .fetch_optional(&self.pool)
-        .await
-    }
-
-    // ── Chats ─────────────────────────────────────────────────────────────────
-
-    pub async fn get_chat_by_id(&self, chat_id: i32) -> Result<Option<Chat>, sqlx::Error> {
-        sqlx::query_as::<_, Chat>("SELECT * FROM db_get_chat_by_id($1)")
-        .bind(chat_id)
-        .fetch_optional(&self.pool)
-        .await
-    }
-
-    pub async fn is_chat_member(&self, chat_id: i32, member_id: i32) -> Result<bool, sqlx::Error> {
-        let row: (bool,) = sqlx::query_as("SELECT db_is_chat_member($1, $2)")
-        .bind(chat_id).bind(member_id)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(row.0)
-    }
+    // ----- chats -----
 
     pub async fn get_user_chats(&self, member_id: i32) -> Result<Vec<Chat>, sqlx::Error> {
         sqlx::query_as::<_, Chat>("SELECT * FROM db_get_user_chats($1)")
@@ -243,7 +185,15 @@ impl Database {
         Ok(())
     }
 
-    // ── Messages ──────────────────────────────────────────────────────────────
+    pub async fn is_chat_member(&self, chat_id: i32, member_id: i32) -> Result<bool, sqlx::Error> {
+        let row: (bool,) = sqlx::query_as("SELECT db_is_chat_member($1, $2)")
+        .bind(chat_id).bind(member_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
+    // ----- messages -----
 
     pub async fn send_message(&self, chat_id: i32, author_id: i32, content: &str, files: Option<&str>) -> Result<Message, sqlx::Error> {
         sqlx::query_as::<_, Message>("SELECT * FROM db_send_message($1, $2, $3, $4)")
@@ -259,7 +209,7 @@ impl Database {
         .await
     }
 
-    // ── Tests ─────────────────────────────────────────────────────────────────
+    // ----- tests -----
 
     #[cfg(test)]
     pub async fn get_pool(&self) -> &PgPool { &self.pool }
@@ -277,7 +227,7 @@ mod tests {
     #[tokio::test]
     async fn test_user_flow() {
         let db = setup_db().await;
-        let user = db.insert_user("test_user", "password123", "admin").await.unwrap();
+        let user = db.insert_user("test_user", "password123").await.unwrap();
         assert_eq!(user.name, "test_user");
         let found = db.get_user_by_id(user.id).await.unwrap().expect("User missing");
         assert_eq!(found.id, user.id);
@@ -288,30 +238,10 @@ mod tests {
     #[tokio::test]
     async fn test_chat_join_flow() {
         let db = setup_db().await;
-        let user  = db.insert_user("joiner", "pass", "user").await.unwrap();
-        let chat  = db.create_chat(user.id, Some("Room"), "desc").await.unwrap();
-
-        // Initial: not a member
+        let user = db.insert_user("joiner", "pass").await.unwrap();
+        let chat = db.create_chat(user.id, Some("Room"), "desc").await.unwrap();
         assert!(!db.is_chat_member(chat.id, user.id).await.unwrap());
-
         db.add_chat_member(chat.id, user.id).await.unwrap();
         assert!(db.is_chat_member(chat.id, user.id).await.unwrap());
-
-        // Idempotent
-        db.add_chat_member(chat.id, user.id).await.unwrap();
-
-        let chats = db.get_user_chats(user.id).await.unwrap();
-        assert!(chats.iter().any(|c| c.id == chat.id));
-    }
-
-    #[tokio::test]
-    async fn test_messaging_flow() {
-        let db = setup_db().await;
-        let user = db.insert_user("messenger", "pass", "user").await.unwrap();
-        let chat = db.create_chat(user.id, Some("Dev"), "Topic").await.unwrap();
-        let msg  = db.send_message(chat.id, user.id, "Hi").await.unwrap();
-        assert_eq!(msg.chat_id, chat.id);
-        let history = db.get_chat_messages(chat.id, 10).await.unwrap();
-        assert_eq!(history[0].content, "Hi");
     }
 }

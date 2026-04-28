@@ -166,6 +166,14 @@ pub fn ws(
         });
 
         {
+            let r = Arc::clone(&reg);
+            router.on("roles_update", move |sess, data| {
+                let r = Arc::clone(&r);
+                async move { handlers::roles_update(sess, data, r).await }
+            });
+        }
+
+        {
             let ss = srv_state.clone();
             router.on("terminal_cmd", move |sess, data| {
                 let ss = ss.clone();
@@ -248,33 +256,38 @@ pub fn ws(
                                     let pub_at  = secure::get_token(16);
                                     let priv_at = secure::get_token(32);
 
-                                    if let (Some(tx), Ok(chats)) =
-                                        (&bcast_tx, store.get_user_chats(user.id).await)
-                                        {
-                                            for chat in chats {
-                                                registry.join(chat.id, SessionEntry {
-                                                    session_id:   session_id.clone(),
-                                                              user_id:      user.id,
-                                                              broadcast_tx: tx.clone(),
-                                                }).await;
-                                            }
+                                    let roles = store.get_user_roles(user.id).await.unwrap_or_default();
+                                    let role_names: Vec<String>  = roles.iter().map(|r| r.name.clone()).collect();
+                                    let permissions: Vec<i32>    = crate::db::roles::resolve_permissions(&roles);
+
+                                    if let (Some(tx), Ok(chats)) = (&bcast_tx, store.get_user_chats(user.id).await) {
+                                        for chat in chats {
+                                            registry.join(chat.id, SessionEntry {
+                                                session_id:   session_id.clone(),
+                                                          user_id:      user.id,
+                                                          broadcast_tx: tx.clone(),
+                                            }).await;
                                         }
+                                    }
+                                    registry.register_user_session(user.id, Arc::clone(&session)).await;
 
-                                        let enc = secure::encrypt(&priv_vtns, json!({
-                                            "event":    "login_ok",
-                                            "pub_at":   pub_at,
-                                            "priv_at":  priv_at,
-                                            "user_id":  user.id,
-                                            "username": user.name,
-                                            "roles":    user.roles,
-                                        }).to_string().as_bytes());
+                                    let enc = secure::encrypt(&priv_vtns, json!({
+                                        "event":       "login_ok",
+                                        "pub_at":      pub_at,
+                                        "priv_at":     priv_at,
+                                        "user_id":     user.id,
+                                        "username":    user.name,
+                                        "roles":       role_names,
+                                        "permissions": permissions,
+                                    }).to_string().as_bytes());
 
-                                        let mut s = session.lock().await;
-                                        let _ = s.send_binary(enc).await;
-                                        s.user_id = Some(user.id);
-                                        s.state   = SessionState::Authenticated {
-                                            pub_at, priv_at, issued_at: Instant::now(),
-                                        };
+                                    let mut s = session.lock().await;
+                                    let _ = s.send_binary(enc).await;
+                                    s.user_id     = Some(user.id);
+                                    s.permissions = permissions;
+                                    s.state       = SessionState::Authenticated {
+                                        pub_at, priv_at, issued_at: Instant::now(),
+                                    };
                                 }
                                 Err(code) => {
                                     let s = session.lock().await;
@@ -284,10 +297,15 @@ pub fn ws(
                         }
 
                         "register" => {
-                            let (username, password) = (
-                                payload["username"].as_str().unwrap_or("").to_string(),
-                                                        payload["password"].as_str().unwrap_or("").to_string(),
-                            );
+                            let (username, password, session_id, bcast_tx) = {
+                                let s = session.lock().await;
+                                (
+                                    payload["username"].as_str().unwrap_or("").to_string(),
+                                 payload["password"].as_str().unwrap_or("").to_string(),
+                                 s.id.clone(),
+                                 s.broadcast_tx.clone(),
+                                )
+                            };
 
                             let register_result = async {
                                 if username.len() < 3 || username.len() > 32 {
@@ -302,34 +320,41 @@ pub fn ws(
                                     {
                                         return Err("username_taken");
                                     }
-                                let hashed = tokio::task::spawn_blocking(move || secure::hash_password(&password))
+                                    let hashed = tokio::task::spawn_blocking(move || secure::hash_password(&password))
                                     .await
                                     .map_err(|_| "hash_error")?
                                     .map_err(|_| "hash_error")?;
-
-                                store.set_user(&username, &hashed, "user")
-                                    .await
-                                    .map_err(|_| "db_error")
-                                }.await;
+                                store.insert_user(&username, &hashed)
+                                .await
+                                .map_err(|_| "db_error")
+                            }.await;
 
                             match register_result {
                                 Ok(user) => {
                                     let pub_at  = secure::get_token(16);
                                     let priv_at = secure::get_token(32);
 
+                                    let roles       = store.get_user_roles(user.id).await.unwrap_or_default();
+                                    let role_names: Vec<String> = roles.iter().map(|r| r.name.clone()).collect();
+                                    let permissions: Vec<i32>   = crate::db::roles::resolve_permissions(&roles);
+
+                                    registry.register_user_session(user.id, Arc::clone(&session)).await;
+
                                     let enc = secure::encrypt(&priv_vtns, json!({
-                                        "event":    "register_ok",
-                                        "pub_at":   pub_at,
-                                        "priv_at":  priv_at,
-                                        "user_id":  user.id,
-                                        "username": user.name,
-                                        "roles":    user.roles,
+                                        "event":       "register_ok",
+                                        "pub_at":      pub_at,
+                                        "priv_at":     priv_at,
+                                        "user_id":     user.id,
+                                        "username":    user.name,
+                                        "roles":       role_names,
+                                        "permissions": permissions,
                                     }).to_string().as_bytes());
 
                                     let mut s = session.lock().await;
                                     let _ = s.send_binary(enc).await;
-                                    s.user_id = Some(user.id);
-                                    s.state   = SessionState::Authenticated {
+                                    s.user_id     = Some(user.id);
+                                    s.permissions = permissions;
+                                    s.state       = SessionState::Authenticated {
                                         pub_at, priv_at, issued_at: Instant::now(),
                                     };
                                 }
@@ -339,7 +364,6 @@ pub fn ws(
                                 }
                             }
                         }
-
                         _ => {}
                     }
                 }

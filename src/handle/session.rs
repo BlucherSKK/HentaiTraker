@@ -24,16 +24,16 @@ pub enum SessionState {
 }
 
 pub struct Session {
-    pub id:            String,
-    pub state:         SessionState,
-    pub tx:            mpsc::Sender<Message>,
-    /// Broadcast канал: plain JSON → воркер шифрует и пишет в сокет.
-    pub broadcast_tx:  Option<mpsc::Sender<Value>>,
-    pub user_id:       Option<i32>,
-    pub pub_vtns:      String,
-    pub connected_at:  Instant,
-    pub last_activity: Instant,
-    pub store:         Option<Arc<Store>>,
+    pub id:               String,
+    pub state:            SessionState,
+    pub tx:               mpsc::Sender<Message>,
+    pub broadcast_tx:     Option<mpsc::Sender<Value>>,
+    pub user_id:          Option<i32>,
+    pub permissions:      Vec<i32>,
+    pub pub_vtns:         String,
+    pub connected_at:     Instant,
+    pub last_activity:    Instant,
+    pub store:            Option<Arc<Store>>,
     pub is_authenticated: bool,
 }
 
@@ -41,17 +41,22 @@ impl Session {
     pub fn new(tx: mpsc::Sender<Message>, pub_vtns: String) -> Self {
         let now = Instant::now();
         Self {
-            id:            secure::get_token(16),
-            state:         SessionState::Entrypoint,
+            id:               secure::get_token(16),
+            state:            SessionState::Entrypoint,
             tx,
-            broadcast_tx:  None,
-            user_id:       None,
+            broadcast_tx:     None,
+            user_id:          None,
+            permissions:      Vec::new(),
             pub_vtns,
-            connected_at:  now,
-            last_activity: now,
-            store:         None,
+            connected_at:     now,
+            last_activity:    now,
+            store:            None,
             is_authenticated: false,
         }
+    }
+
+    pub fn has_permission(&self, perm: i32) -> bool {
+        self.permissions.contains(&perm)
     }
 
     pub async fn send_binary(&self, data: Vec<u8>) -> Result<(), mpsc::error::SendError<Message>> {

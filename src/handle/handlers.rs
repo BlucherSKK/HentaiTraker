@@ -6,6 +6,7 @@ use super::registry::{SessionRegistry, SessionEntry};
 use crate::upload::UploadTokenStore;
 use crate::admin;
 use crate::admin::metric;
+use crate::db::roles::{resolve_permissions, role_names, Permission};
 // ─── chat_join ────────────────────────────────────────────────────────────────
 
 /// Вступление пользователя в существующий чат.
@@ -100,12 +101,8 @@ pub async fn chat_join(
 }
 
 
-// ─── profile_get ─────────────────────────────────────────────────────────────
+// ----- profile_get -----
 
-/// Получение профиля пользователя.
-///
-/// Payload:  `{ user_id?: i32 }` (по умолчанию — свой профиль)
-/// Ответ OK: `{ event: "profile_ok", id, name, avatar, tags, roles }`
 pub async fn profile_get(session: Arc<Mutex<Session>>, data: Value) {
     let (store, user_id) = {
         let s = session.lock().await;
@@ -123,37 +120,46 @@ pub async fn profile_get(session: Arc<Mutex<Session>>, data: Value) {
 
     let target_id = data["user_id"].as_i64().map(|id| id as i32).unwrap_or(requester_id);
 
-    match store.get_user(target_id).await {
-        Ok(Some(user)) => {
-            let s = session.lock().await;
-            s.send_encrypted(&json!({
-                "event":  "profile_ok",
-                "id":     user.id,
-                "name":   user.name,
-                "avatar": user.avatar,
-                "tags":   user.tags,
-                "roles":  user.roles,
-            })).await;
-        }
+    let user = match store.get_user(target_id).await {
+        Ok(Some(u)) => u,
         Ok(None) => {
             let s = session.lock().await;
             s.send_encrypted(&json!({ "event": "error", "code": "user_not_found" })).await;
+            return;
         }
         Err(e) => {
             error!("profile_get: {e}");
             let s = session.lock().await;
             s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+            return;
         }
-    }
+    };
+
+    let roles = match store.get_user_roles(target_id).await {
+        Ok(r) => r,
+        Err(e) => {
+            error!("profile_get roles: {e}");
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+            return;
+        }
+    };
+
+    let permissions = resolve_permissions(&roles);
+    let s = session.lock().await;
+    s.send_encrypted(&json!({
+        "event":       "profile_ok",
+        "id":          user.id,
+        "name":        user.name,
+        "avatar":      user.avatar,
+        "tags":        user.tags,
+        "roles":       role_names(&roles),
+                            "permissions": permissions,
+    })).await;
 }
 
-// ─── profile_update ──────────────────────────────────────────────────────────
+// ----- profile_update -----
 
-/// Обновление профиля пользователя.
-///
-/// Payload:  `{ user_id?: i32, name?: string, avatar?: string, tags?: string, roles?: string }`
-/// Ответ OK: `{ event: "profile_updated", id, name, avatar, tags, roles }`
-/// Ошибки:   `{ event: "error", code: "unauthorized" | "user_not_found" | "db_error" }`
 pub async fn profile_update(session: Arc<Mutex<Session>>, data: Value) {
     let (store, user_id) = {
         let s = session.lock().await;
@@ -173,32 +179,129 @@ pub async fn profile_update(session: Arc<Mutex<Session>>, data: Value) {
     let name   = data["name"].as_str();
     let avatar = data["avatar"].as_str();
     let tags   = data["tags"].as_str();
-    let roles  = data["roles"].as_str();
 
-    match store.update_user(target_id, modifier_id, name, None, avatar, tags, roles).await {
-        Ok(Some(user)) => {
-            let s = session.lock().await;
-            s.send_encrypted(&json!({
-                "event":  "profile_updated",
-                "id":     user.id,
-                "name":   user.name,
-                "avatar": user.avatar,
-                "tags":   user.tags,
-                "roles":  user.roles,
-            })).await;
-        }
+    let user = match store.update_user(target_id, modifier_id, name, None, avatar, tags).await {
+        Ok(Some(u)) => u,
         Ok(None) => {
             let s = session.lock().await;
             s.send_encrypted(&json!({ "event": "error", "code": "unauthorized" })).await;
+            return;
         }
         Err(e) => {
             error!("profile_update: {e}");
             let s = session.lock().await;
             s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+            return;
         }
-    }
+    };
+
+    let roles = match store.get_user_roles(target_id).await {
+        Ok(r) => r,
+        Err(e) => {
+            error!("profile_update roles: {e}");
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+            return;
+        }
+    };
+
+    let permissions = resolve_permissions(&roles);
+    let s = session.lock().await;
+    s.send_encrypted(&json!({
+        "event":       "profile_updated",
+        "id":          user.id,
+        "name":        user.name,
+        "avatar":      user.avatar,
+        "tags":        user.tags,
+        "roles":       role_names(&roles),
+                            "permissions": permissions,
+    })).await;
 }
 
+// ----- roles_update -----
+// Payload:  { user_id: i32, role_ids: i32[] }
+// Ответ OK: { event: "roles_updated", user_id, roles: string[], permissions: i32[] }
+// Ошибки:   { event: "error", code: "unauthenticated" | "unauthorized" | "db_error" }
+
+/// ----- roles_update -----
+
+pub async fn roles_update(
+    session:  Arc<Mutex<Session>>,
+    data:     Value,
+    registry: Arc<SessionRegistry>,
+) {
+    let (store, modifier_id, can_manage) = {
+        let s = session.lock().await;
+        let can = s.has_permission(Permission::ManageRoles.as_i32());
+        (s.store.clone(), s.user_id, can)
+    };
+
+    let store = match store { Some(s) => s, None => return };
+
+    let modifier_id = match modifier_id {
+        Some(id) => id,
+        None => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "unauthenticated" })).await;
+            return;
+        }
+    };
+
+    if !can_manage {
+        let s = session.lock().await;
+        s.send_encrypted(&json!({ "event": "error", "code": "unauthorized" })).await;
+        return;
+    }
+
+    let target_id = match data["user_id"].as_i64() {
+        Some(id) => id as i32,
+        None => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "missing_user_id" })).await;
+            return;
+        }
+    };
+
+    let role_ids: Vec<i32> = match data["role_ids"].as_array() {
+        Some(arr) => arr.iter().filter_map(|v| v.as_i64().map(|i| i as i32)).collect(),
+        None => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "missing_role_ids" })).await;
+            return;
+        }
+    };
+
+    let roles = match store.db.set_user_roles(target_id, &role_ids).await {
+        Ok(_) => match store.get_user_roles(target_id).await {
+            Ok(r) => r,
+            Err(e) => {
+                error!("roles_update get_user_roles: {e}");
+                let s = session.lock().await;
+                s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+                return;
+            }
+        },
+        Err(e) => {
+            error!("roles_update set_user_roles: {e}");
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+            return;
+        }
+    };
+
+    let names       = role_names(&roles);
+    let permissions = resolve_permissions(&roles);
+
+    registry.notify_roles_updated(target_id, &names, &permissions).await;
+
+    let s = session.lock().await;
+    s.send_encrypted(&json!({
+        "event":       "roles_update_ok",
+        "user_id":     target_id,
+        "roles":       names,
+        "permissions": permissions,
+    })).await;
+}
 
 // ─── chat_list ───────────────────────────────────────────────────────────────
 
@@ -252,7 +355,7 @@ pub async fn post_create(session: Arc<Mutex<Session>>, data: Value) {
     let store   = match store   { Some(s) => s, None => return };
     let user_id = match user_id { Some(id) => id, None => return };
 
-    let has_posting = match store.user_has_permission(user_id, 6).await {
+    let has_posting = match store.user_has_permission(user_id, Permission::Posting).await {
         Ok(v)  => v,
         Err(e) => {
             error!("post_create permission check: {e}");
@@ -279,7 +382,7 @@ pub async fn post_create(session: Arc<Mutex<Session>>, data: Value) {
         return;
     }
 
-    match store.create_post(user_id, title, &content, files.as_deref(), &tags).await {
+    match store.create_post(user_id, title, &content, Some(tags.as_str())).await {
         Ok(post) => {
             let s = session.lock().await;
             s.send_encrypted(&json!({
@@ -314,7 +417,7 @@ pub async fn user_posts(session: Arc<Mutex<Session>>, data: Value) {
 
     let limit = data["limit"].as_i64().unwrap_or(20).clamp(1, 100);
 
-    match store.get_posts_by_author(user_id, limit).await {
+    match store.get_posts_by_author(user_id, limit as i32).await {
         Ok(posts) => {
             let s = session.lock().await;
             s.send_encrypted(&json!({ "event": "user_posts", "posts": posts })).await;
@@ -431,18 +534,13 @@ pub async fn get_upload_token(
 
 /// Payload: `{ input: string }`
 pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value, srv_state: metric::ServerState) {
-    let (store, user_id) = {
+    let perm = {
         let s = session.lock().await;
-        (s.store.clone(), s.user_id)
+        s.permissions.clone()
     };
-    let store   = match store   { Some(s) => s, None => return };
-    let user_id = match user_id { Some(id) => id, None => return };
+    let accept  = perm.contains(&(Permission::Terminal as i32));
 
-    let roles = match store.get_user(user_id).await {
-        Ok(Some(u)) => u.roles.unwrap_or_default(),
-        _ => return,
-    };
-    if !roles.split(',').any(|r| r.trim() == "admin") {
+    if !accept {
         let s = session.lock().await;
         s.send_encrypted(&json!({ "event": "error", "code": "forbidden" })).await;
         return;

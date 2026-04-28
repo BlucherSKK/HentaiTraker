@@ -1,10 +1,8 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 
-// ─── Permission enum ─────────────────────────────────────────────────────────
+// ----- Permission -----
 
-/// Хардкодированный список прав. Индексы (i32) хранятся в roles.permissions[].
-/// Порядок — контракт: никогда не менять значения уже выпущенных вариантов.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(i32)]
 pub enum Permission {
@@ -15,10 +13,10 @@ pub enum Permission {
     ManageRoles = 4,
     Ban         = 5,
     Posting     = 6,
+    Terminal    = 7,
 }
 
 impl Permission {
-    /// Все варианты в порядке возрастания индекса.
     pub const ALL: &'static [Permission] = &[
         Permission::Read,
         Permission::Write,
@@ -27,6 +25,7 @@ impl Permission {
         Permission::ManageRoles,
         Permission::Ban,
         Permission::Posting,
+        Permission::Terminal,
     ];
 
     pub fn as_i32(self) -> i32 { self as i32 }
@@ -40,11 +39,11 @@ impl Permission {
             4 => Some(Self::ManageRoles),
             5 => Some(Self::Ban),
             6 => Some(Self::Posting),
+            7 => Some(Self::Terminal),
             _ => None,
         }
     }
 
-    /// Имя роли-одиночки для этого права, например "force_read".
     pub fn force_role_name(self) -> &'static str {
         match self {
             Self::Read        => "force_read",
@@ -54,28 +53,43 @@ impl Permission {
             Self::ManageRoles => "force_manage_roles",
             Self::Ban         => "force_ban",
             Self::Posting     => "force_posting",
+            Self::Terminal    => "force_terminal",
         }
     }
 }
 
-// ─── Domain structs ──────────────────────────────────────────────────────────
+// ----- Role / UserRole -----
 
-/// Запись из таблицы roles.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct Role {
     pub id:          i32,
     pub name:        String,
-    pub permissions: Vec<i32>,  // индексы Permission
+    pub permissions: Vec<i32>,
 }
 
-/// Запись из связующей таблицы user_roles (many-to-many).
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct UserRole {
     pub user_id: i32,
     pub role_id: i32,
 }
 
-// ─── Bootstrap ───────────────────────────────────────────────────────────────
+// ----- helpers -----
+
+pub fn resolve_permissions(roles: &[Role]) -> Vec<i32> {
+    let mut perms: Vec<i32> = roles
+    .iter()
+    .flat_map(|r| r.permissions.iter().copied())
+    .collect();
+    perms.sort_unstable();
+    perms.dedup();
+    perms
+}
+
+pub fn role_names(roles: &[Role]) -> Vec<String> {
+    roles.iter().map(|r| r.name.clone()).collect()
+}
+
+// ----- bootstrap -----
 
 pub async fn init_roles(pool: &PgPool) -> Result<(), sqlx::Error> {
     let all_perms: Vec<i32> = Permission::ALL.iter().map(|p| p.as_i32()).collect();
@@ -96,7 +110,6 @@ pub async fn init_roles(pool: &PgPool) -> Result<(), sqlx::Error> {
         .execute(pool).await?;
     }
 
-    // ── Bootstrap: user id=1 → admin ─────────────────────────────────────────
     sqlx::query(r#"
     INSERT INTO user_roles (user_id, role_id)
     SELECT 1, id FROM roles WHERE name = 'admin'
