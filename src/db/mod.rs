@@ -237,8 +237,8 @@ impl Store {
         Ok(self.db.get_post_by_id(post_id).await?)
     }
 
-    pub async fn create_post(&self, author_id: i32, title: Option<&str>, content: &str, tags: Option<&str>) -> Result<Post, StoreError> {
-        Ok(self.db.create_post(author_id, title, content, tags).await?)
+    pub async fn create_post(&self, author_id: i32, title: Option<&str>, content: &str, files: Option<&str>, tags: Option<&str>) -> Result<Post, StoreError> {
+        Ok(self.db.create_post(author_id, title, content, files, tags).await?)
     }
 
     pub async fn get_latest_posts(&self, limit: i64) -> Result<Vec<Post>, StoreError> {

@@ -83,7 +83,7 @@ BEGIN
         permissions INTEGER[] NOT NULL DEFAULT '{}'
     );
     INSERT INTO roles (name, permissions)
-    VALUES ('admin', ARRAY[0,1,2,3,4,5,6,7])
+    VALUES ('admin', ARRAY[-1])
     ON CONFLICT (name) DO NOTHING;
 END;
 $$ LANGUAGE plpgsql;
@@ -233,12 +233,12 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION db_create_post(p_author_id INT, p_title TEXT, p_content TEXT, p_tags TEXT)
+CREATE OR REPLACE FUNCTION db_create_post(p_author_id INT, p_title TEXT, p_content TEXT, p_files TEXT, p_tags TEXT)
 RETURNS SETOF posts LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
         INSERT INTO posts (title, content, files, author_id, time, tags)
-        VALUES (p_title, p_content, NULL, p_author_id, NOW(), p_tags)
+        VALUES (p_title, p_content, p_files, p_author_id, NOW(), p_tags)
         RETURNING *;
 END;
 $$;

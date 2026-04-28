@@ -1,3 +1,4 @@
+use rocket::http::ext::IntoCollection;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 
@@ -72,7 +73,6 @@ pub struct UserRole {
     pub user_id: i32,
     pub role_id: i32,
 }
-
 // ----- helpers -----
 
 pub fn resolve_permissions(roles: &[Role]) -> Vec<i32> {
@@ -82,6 +82,9 @@ pub fn resolve_permissions(roles: &[Role]) -> Vec<i32> {
     .collect();
     perms.sort_unstable();
     perms.dedup();
+    if perms.contains(&-1) {
+        return Permission::ALL.iter().map(|p| p.as_i32()).collect();
+    }
     perms
 }
 

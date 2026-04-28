@@ -388,8 +388,11 @@ pub async fn post_create(session: Arc<Mutex<Session>>, data: Value) {
         s.send_encrypted(&json!({ "event": "error", "code": "empty_content" })).await;
         return;
     }
+    let files_s = data["files"].as_str()
+    .filter(|s| !s.is_empty())
+    .map(strip_nulls);
 
-    match store.create_post(user_id, title_s.as_deref(), &content_s, Some(&tags_s)).await {
+    match store.create_post(user_id, title_s.as_deref(), &content_s, files_s.as_deref(), Some(&tags_s)).await {
         Ok(post) => {
             let s = session.lock().await;
             s.send_encrypted(&json!({

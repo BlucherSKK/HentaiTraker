@@ -147,9 +147,9 @@ impl Database {
         .await
     }
 
-    pub async fn create_post(&self, author_id: i32, title: Option<&str>, content: &str, tags: Option<&str>) -> Result<Post, sqlx::Error> {
-        sqlx::query_as::<_, Post>("SELECT * FROM db_create_post($1, $2, $3, $4)")
-        .bind(author_id).bind(title).bind(content).bind(tags)
+    pub async fn create_post(&self, author_id: i32, title: Option<&str>, content: &str, files: Option<&str>, tags: Option<&str>) -> Result<Post, sqlx::Error> {
+        sqlx::query_as::<_, Post>("SELECT * FROM db_create_post($1, $2, $3, $4, $5)")
+        .bind(author_id).bind(title).bind(content).bind(files).bind(tags)
         .fetch_one(&self.pool)
         .await
     }
