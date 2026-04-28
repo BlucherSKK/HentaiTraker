@@ -95,13 +95,12 @@ pub fn role_names(roles: &[Role]) -> Vec<String> {
 // ----- bootstrap -----
 
 pub async fn init_roles(pool: &PgPool) -> Result<(), sqlx::Error> {
-    let all_perms: Vec<i32> = Permission::ALL.iter().map(|p| p.as_i32()).collect();
 
     sqlx::query(
-        "INSERT INTO roles (name, permissions) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING"
+        "INSERT INTO roles (name, permissions) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET permissions = EXCLUDED.permissions"
     )
     .bind("admin")
-    .bind(&all_perms)
+    .bind(vec![-1_i32])
     .execute(pool).await?;
 
     for perm in Permission::ALL {
