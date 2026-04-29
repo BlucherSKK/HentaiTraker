@@ -67,7 +67,7 @@ BEGIN
         descript  TEXT,
         images    TEXT, -- имя аватарки чата и возможно в будешем добавим
         author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        time      TIMESTAMP NOT NULL
+        time      TIMESTAMP NOT NULL,
         last_msg  INTEGER REFERENCES msg(id),
         soft_ref  TEXT
     );

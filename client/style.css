@@ -29,6 +29,15 @@
 
 /* Добавить в client/style.css */
 
+.profile-btn, .profile-btn:active {
+   color: blue;
+   text-decoration: underline;
+}
+
+.profile-btn:hover {
+    color: cyan;
+}
+
 .profile-posts-section {
     width: 100%;
     max-width: 520px;

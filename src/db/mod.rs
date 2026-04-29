@@ -45,7 +45,7 @@ pub struct Post {
 pub struct Chat {
     pub id:        i32,
     pub title:     Option<String>,
-    pub content:   String,
+    pub descript:   String,
     pub images:    Option<String>,
     pub author_id: i32,
     pub time:      NaiveDateTime,

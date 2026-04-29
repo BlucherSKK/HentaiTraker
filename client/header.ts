@@ -64,8 +64,7 @@ export function get_header(page: string, user?: User): string {
     <span id="${PING_DOT_ID}" title="WebSocket"></span>
     ${user
         ? `<div class="user-container">
-        <span>${user.name}</span>
-        <a data-link="profile">Профиль</a>
+        <span class="profile-btn" data-link="profile">${user.name}</span>
         </div>`
         : `<a class="auth-btn" data-link="login">
         <img src="${SVG_LOGIN}"/>
