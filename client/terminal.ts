@@ -43,14 +43,10 @@ export class TerminalPage extends HTMLElement {
     }
 
     private async _start() {
-        await Promise.resolve();
-
         if (this._started) {
-            if (window.__TERMINAL_INIT__) {
-                window.__TERMINAL_WS__ = this._ws;
-                window.__TERMINAL_INIT__();
-                this._hideLoader();
-            }
+            window.__TERMINAL_WS__ = this._ws;
+            (window as any).__TERMINAL_INIT__?.();
+            this._hideLoader();
             return;
         }
         this._started = true;
@@ -58,7 +54,7 @@ export class TerminalPage extends HTMLElement {
         window.__TERMINAL_WS__ = this._ws;
 
         if (window.__TERMINAL_INIT__) {
-            window.__TERMINAL_INIT__();
+            (window as any).__TERMINAL_INIT__?.();
             this._hideLoader();
             return;
         }
@@ -78,6 +74,7 @@ export class TerminalPage extends HTMLElement {
                 document.body.appendChild(script);
             });
 
+            (window as any).__TERMINAL_INIT__?.();
             this._hideLoader();
 
         } catch (err) {

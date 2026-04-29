@@ -6,13 +6,18 @@ CREATE OR REPLACE FUNCTION init_user_table()
 RETURNS void AS $$
 BEGIN
     CREATE TABLE IF NOT EXISTS users (
-        id         SERIAL PRIMARY KEY,
-        name       TEXT NOT NULL,
-        pass       VARCHAR(255) NOT NULL,
-        last_visit TIMESTAMP NOT NULL,
-        avatar     TEXT,
-        tags       TEXT,
-        settings   TEXT
+        id              SERIAL PRIMARY KEY,    -- ид
+        name            TEXT NOT NULL,         -- имя
+        pass            VARCHAR(255) NOT NULL, -- хеш пароля
+        last_visit      TIMESTAMP NOT NULL, -- время последнего посешения
+        avatar          TEXT, -- имя файла аватарки на сервере
+        tags            TEXT, -- теги интересов записанные просто через ,
+        settings        TEXT, -- настройки клиента тупо json инлайн
+        score           BIGINT DEFAULT 0, -- очки кармы
+        score_state     TEXT, -- это стайт машины которые будут просто инлайн json
+        soft_ref        TEXT  -- поле для установления связи сушности user с чем угодно, проверки и каскадное
+                              -- удаление делегировано бекендуб зато можно не мигрируя таблицу префирица на новые сущности
+                              -- в неограниченном количестве
     );
 END;
 $$ LANGUAGE plpgsql;
@@ -34,16 +39,37 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+
+
+CREATE OR REPLACE FUNCTION init_msg_table()
+RETURNS void AS $$
+BEGIN
+    CREATE TABLE IF NOT EXISTS msg (
+        id          SERIAL PRIMARY KEY,
+        content     TEXT NOT NULL,
+        files       TEXT,
+        author_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        chat_id     INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+        respons_on  INTEGER REFERENCES msg(id),
+        time        TIMESTAMP NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_msg_chat_time ON msg (chat_id, time DESC);
+END;
+$$ LANGUAGE plpgsql;
+
 CREATE OR REPLACE FUNCTION init_chats_table()
 RETURNS void AS $$
 BEGIN
     CREATE TABLE IF NOT EXISTS chats (
         id        SERIAL PRIMARY KEY,
         title     TEXT,
-        content   TEXT NOT NULL,
-        images    TEXT,
+        tags      TEXT,
+        descript  TEXT,
+        images    TEXT, -- имя аватарки чата и возможно в будешем добавим
         author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         time      TIMESTAMP NOT NULL
+        last_msg  INTEGER REFERENCES msg(id),
+        soft_ref  TEXT
     );
 END;
 $$ LANGUAGE plpgsql;
@@ -56,21 +82,6 @@ BEGIN
         chat_id   INTEGER REFERENCES chats(id) ON DELETE CASCADE,
         PRIMARY KEY (member_id, chat_id)
     );
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION init_msg_table()
-RETURNS void AS $$
-BEGIN
-    CREATE TABLE IF NOT EXISTS msg (
-        id        SERIAL PRIMARY KEY,
-        content   TEXT NOT NULL,
-        files     TEXT,
-        author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        chat_id   INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
-        time      TIMESTAMP NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_msg_chat_time ON msg (chat_id, time DESC);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -182,6 +193,16 @@ CREATE OR REPLACE FUNCTION db_update_user(
     p_tags        TEXT
 ) RETURNS SETOF users LANGUAGE plpgsql AS $$
 BEGIN
+    -- ----- create new user -----
+    IF p_modifier_id = -1 THEN
+        RETURN QUERY
+            INSERT INTO users (name, pass, last_visit)
+            VALUES (p_name, p_pass, NOW())
+            RETURNING *;
+        RETURN;
+    END IF;
+
+    -- ----- self update -----
     IF p_target_id = p_modifier_id THEN
         RETURN QUERY
             UPDATE users SET
@@ -191,21 +212,23 @@ BEGIN
                 tags   = COALESCE(p_tags,   tags)
             WHERE id = p_target_id
             RETURNING *;
-    ELSE
-        IF EXISTS (
-            SELECT 1 FROM roles r
-            JOIN user_roles ur ON ur.role_id = r.id
-            WHERE ur.user_id = p_modifier_id AND r.name = 'admin'
-        ) THEN
-            RETURN QUERY
-                UPDATE users SET
-                    name   = COALESCE(p_name,   name),
-                    pass   = COALESCE(p_pass,   pass),
-                    avatar = COALESCE(p_avatar, avatar),
-                    tags   = COALESCE(p_tags,   tags)
-                WHERE id = p_target_id
-                RETURNING *;
-        END IF;
+        RETURN;
+    END IF;
+
+    -- ----- admin update -----
+    IF EXISTS (
+        SELECT 1 FROM roles r
+        JOIN user_roles ur ON ur.role_id = r.id
+        WHERE ur.user_id = p_modifier_id AND r.name = 'admin'
+    ) THEN
+        RETURN QUERY
+            UPDATE users SET
+                name   = COALESCE(p_name,   name),
+                pass   = COALESCE(p_pass,   pass),
+                avatar = COALESCE(p_avatar, avatar),
+                tags   = COALESCE(p_tags,   tags)
+            WHERE id = p_target_id
+            RETURNING *;
     END IF;
 END;
 $$;

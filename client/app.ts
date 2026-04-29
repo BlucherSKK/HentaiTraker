@@ -2,7 +2,7 @@ import { STYLES } from "./assets";
 import { AuthPage } from "./auth";
 import { Chats } from "./chats";
 import { HntDataBase, init_test_db } from "./db";
-import { get_header, get_nonlogin_dm_noty } from "./header";
+import { bindPingIndicator, get_header, get_nonlogin_dm_noty } from "./header";
 import { Feed, HomeNav } from "./home";
 import { AppNav } from "./nav";
 import { HntWsConnection } from "./ws";
@@ -15,8 +15,6 @@ declare global {
     interface Window {
         __VTNS__?: { pub_vtns: string; priv_vtns: string; ws: WebSocket; };
         __MODULE_STYLES__?: Record<string, string>;
-        __TERMINAL_WS__?: HntWsConnection;
-        __TERMINAL_INIT__?: () => void;
     }
 }
 
@@ -122,6 +120,8 @@ const App = {
     setupWsHandlers(): void {
         const ws = this.state.ws;
         if (!ws) return;
+
+        bindPingIndicator(ws);
 
         const onAuthSuccess = (_ev: string, payload: Record<string, unknown>) => {
             this.state.user = {

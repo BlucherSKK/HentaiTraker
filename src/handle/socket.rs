@@ -1,6 +1,7 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::{Mutex, mpsc};
+use tokio::time::interval;
 use rocket::get;
 use rocket::State;
 use rocket::futures::{SinkExt, StreamExt};
@@ -15,6 +16,13 @@ use crate::db::Store;
 use crate::secure;
 use crate::upload::UploadTokenStore;
 use crate::admin::metric;
+
+// ----- constants -----
+
+const PING_INTERVAL: Duration = Duration::from_secs(10);
+const PONG_TIMEOUT:  Duration = Duration::from_secs(5);
+
+// ----- state ctx -----
 
 enum StateCtx {
     Entrypoint,
@@ -32,10 +40,10 @@ fn state_ctx(sess: &Session) -> StateCtx {
     }
 }
 
-fn message_bytes(msg: Message) -> Option<Vec<u8>> {
+fn message_bytes(msg: &Message) -> Option<Vec<u8>> {
     match msg {
-        Message::Binary(b) => Some(b),
-        Message::Text(t)   => Some(t.into_bytes()),
+        Message::Binary(b) => Some(b.clone()),
+        Message::Text(t)   => Some(t.as_bytes().to_vec()),
         _                  => None,
     }
 }
@@ -46,6 +54,8 @@ fn decrypt_and_parse(key: &str, data: &[u8]) -> Option<(String, Value)> {
     let event = json.get("event")?.as_str()?.to_string();
     Some((event, json))
 }
+
+// ----- token refresh -----
 
 async fn handle_token_refresh(sess: &mut Session) {
     let action = match &sess.state {
@@ -76,6 +86,7 @@ async fn handle_token_refresh(sess: &mut Session) {
     }
 }
 
+// ----- ws handler -----
 
 #[get("/ws/<pub_vtns>")]
 pub fn ws(
@@ -95,6 +106,7 @@ pub fn ws(
 
     ws.channel(move |stream| Box::pin(async move {
         srv_state.on_connect().await;
+
         let (mut sink, mut source) = stream.split();
         let (tx, mut rx)           = mpsc::channel::<Message>(32);
 
@@ -104,7 +116,7 @@ pub fn ws(
             }
         });
 
-        let session = Arc::new(Mutex::new(Session::new(tx, pub_vtns)));
+        let session = Arc::new(Mutex::new(Session::new(tx.clone(), pub_vtns)));
 
         let (bcast_tx, mut bcast_rx) = mpsc::channel::<Value>(64);
         {
@@ -112,6 +124,7 @@ pub fn ws(
             s.store        = Some(Arc::clone(&store));
             s.broadcast_tx = Some(bcast_tx);
         }
+
         let bcast_sess = Arc::clone(&session);
         tokio::spawn(async move {
             while let Some(msg) = bcast_rx.recv().await {
@@ -120,8 +133,11 @@ pub fn ws(
             }
         });
 
+        // ----- router -----
+
         let reg = Arc::new(registry.clone());
         let mut router = EventRouter::new();
+
         {
             let r = Arc::clone(&reg);
             router.on("chat_join", move |sess, data| {
@@ -157,14 +173,12 @@ pub fn ws(
         router.on("user_posts", |sess, data| async move {
             handlers::user_posts(sess, data).await
         });
-
         router.on("profile_get", |sess, data| async move {
             handlers::profile_get(sess, data).await
         });
         router.on("profile_update", |sess, data| async move {
             handlers::profile_update(sess, data).await
         });
-
         {
             let r = Arc::clone(&reg);
             router.on("roles_update", move |sess, data| {
@@ -172,7 +186,6 @@ pub fn ws(
                 async move { handlers::roles_update(sess, data, r).await }
             });
         }
-
         {
             let ss = srv_state.clone();
             router.on("terminal_cmd", move |sess, data| {
@@ -183,234 +196,281 @@ pub fn ws(
 
         let router = Arc::new(router);
 
-        while let Some(result) = source.next().await {
-            let raw = match result { Ok(m) => m, Err(_) => break };
-            let raw = match message_bytes(raw) { Some(b) => b, None => continue };
+        // ----- ping/pong state -----
 
-            let ctx = {
-                let mut s = session.lock().await;
-                if s.tokens_expired() { handle_token_refresh(&mut s).await; }
-                s.last_activity = Instant::now();
-                state_ctx(&s)
-            };
+        let mut ping_ticker        = interval(PING_INTERVAL);
+        let mut waiting_pong       = false;
+        let mut pong_deadline: Option<Instant> = None;
 
-            match ctx {
-                StateCtx::Entrypoint => {
-                    let Some(plain) = hnts.try_decrypt(&raw).await else {
-                        let s = session.lock().await;
-                        let _ = s.send_json(&json!({ "event": "error", "code": "decrypt_failed" })).await;
-                        continue;
-                    };
-                    let Ok(val) = serde_json::from_slice::<Value>(&plain) else { continue };
-                    if val["event"].as_str() != Some("auth") { continue; }
+        ping_ticker.tick().await;
 
-                    match (val["pub_vtns"].as_str(), val["priv_vtns"].as_str()) {
-                        (Some(pv), Some(pvt)) => {
-                            let mut s = session.lock().await;
-                            if pv != s.pub_vtns {
-                                let _ = s.send_json(&json!({ "event": "error", "code": "vtns_mismatch" })).await;
-                                continue;
-                            }
-                            s.state = SessionState::LongToken {
-                                public_vtns:  pv.to_string(),
-                                    private_vtns: pvt.to_string(),
-                                        issued_at:    Instant::now(),
-                            };
-                            let _ = s.send_json(&json!({ "event": "auth_ok" })).await;
+        // ----- main loop -----
+
+        loop {
+            tokio::select! {
+                // ----- входящее сообщение -----
+                result = source.next() => {
+                    let Some(result) = result else { break };
+                    let Ok(msg)      = result else { break };
+
+                    match &msg {
+                        Message::Pong(_) => {
+                            waiting_pong  = false;
+                            pong_deadline = None;
+                            continue;
                         }
-                        _ => continue,
+                        Message::Ping(data) => {
+                            let _ = tx.send(Message::Pong(data.clone())).await;
+                            continue;
+                        }
+                        Message::Close(_) => break,
+                                      _ => {}
                     }
-                }
 
-                StateCtx::LongToken(priv_vtns) => {
-                    let Some((event, payload)) = decrypt_and_parse(&priv_vtns, &raw) else {
-                        let s = session.lock().await;
-                        let _ = s.send_json(&json!({ "event": "error", "code": "decrypt_failed" })).await;
-                        continue;
+                    let Some(raw) = message_bytes(&msg) else { continue };
+
+                    let ctx = {
+                        let mut s = session.lock().await;
+                        if s.tokens_expired() { handle_token_refresh(&mut s).await; }
+                        s.last_activity = Instant::now();
+                        state_ctx(&s)
                     };
 
-                    match event.as_str() {
-                        "login" => {
-                            let (username, password, session_id, bcast_tx) = {
+                    match ctx {
+                        // ----- entrypoint -----
+                        StateCtx::Entrypoint => {
+                            let Some(plain) = hnts.try_decrypt(&raw).await else {
                                 let s = session.lock().await;
-                                (
-                                    payload["username"].as_str().unwrap_or("").to_string(),
-                                 payload["password"].as_str().unwrap_or("").to_string(),
-                                 s.id.clone(),
-                                 s.broadcast_tx.clone(),
-                                )
+                                let _ = s.send_json(&json!({ "event": "error", "code": "decrypt_failed" })).await;
+                                continue;
+                            };
+                            let Ok(val) = serde_json::from_slice::<Value>(&plain) else { continue };
+                            if val["event"].as_str() != Some("auth") { continue; }
+
+                            match (val["pub_vtns"].as_str(), val["priv_vtns"].as_str()) {
+                                (Some(pv), Some(pvt)) => {
+                                    let mut s = session.lock().await;
+                                    if pv != s.pub_vtns {
+                                        let _ = s.send_json(&json!({ "event": "error", "code": "vtns_mismatch" })).await;
+                                        continue;
+                                    }
+                                    s.state = SessionState::LongToken {
+                                        public_vtns:  pv.to_string(),
+                                            private_vtns: pvt.to_string(),
+                                                issued_at:    Instant::now(),
+                                    };
+                                    let _ = s.send_json(&json!({ "event": "auth_ok" })).await;
+                                }
+                                _ => continue,
+                            }
+                        }
+
+                        // ----- long token (login / register) -----
+                        StateCtx::LongToken(priv_vtns) => {
+                            let Some((event, payload)) = decrypt_and_parse(&priv_vtns, &raw) else {
+                                let s = session.lock().await;
+                                let _ = s.send_json(&json!({ "event": "error", "code": "decrypt_failed" })).await;
+                                continue;
                             };
 
-                            let login_result = async {
-                                let user = store.get_user_by_name(&username).await
-                                .map_err(|e| { error!("login get_user_by_name: {e}"); "db_error" })?
-                                .ok_or("user_not_found")?;
-                                if !secure::verify_password(&password, &user.pass) {
-                                    return Err("wrong_password");
-                                }
-                                Ok(user)
-                            }.await;
+                            match event.as_str() {
+                                "login" => {
+                                    let (username, password, session_id, bcast_tx) = {
+                                        let s = session.lock().await;
+                                        (
+                                            payload["username"].as_str().unwrap_or("").to_string(),
+                                         payload["password"].as_str().unwrap_or("").to_string(),
+                                         s.id.clone(),
+                                         s.broadcast_tx.clone(),
+                                        )
+                                    };
 
-                            match login_result {
-                                Ok(user) => {
-                                    let pub_at  = secure::get_token(16);
-                                    let priv_at = secure::get_token(32);
+                                    let login_result = async {
+                                        let user = store.get_user_by_name(&username).await
+                                        .map_err(|e| { error!("login get_user_by_name: {e}"); "db_error" })?
+                                        .ok_or("user_not_found")?;
+                                        if !secure::verify_password(&password, &user.pass) {
+                                            return Err("wrong_password");
+                                        }
+                                        Ok(user)
+                                    }.await;
 
-                                    let roles = store.get_user_roles(user.id).await.unwrap_or_default();
-                                    let role_names: Vec<String>  = roles.iter().map(|r| r.name.clone()).collect();
-                                    let permissions: Vec<i32>    = crate::db::roles::resolve_permissions(&roles);
+                                    match login_result {
+                                        Ok(user) => {
+                                            let pub_at  = secure::get_token(16);
+                                            let priv_at = secure::get_token(32);
 
-                                    if let (Some(tx), Ok(chats)) = (&bcast_tx, store.get_user_chats(user.id).await) {
-                                        for chat in chats {
-                                            registry.join(chat.id, SessionEntry {
-                                                session_id:   session_id.clone(),
-                                                          user_id:      user.id,
-                                                          broadcast_tx: tx.clone(),
-                                            }).await;
+                                            let roles        = store.get_user_roles(user.id).await.unwrap_or_default();
+                                            let role_names: Vec<String> = roles.iter().map(|r| r.name.clone()).collect();
+                                            let permissions: Vec<i32>   = crate::db::roles::resolve_permissions(&roles);
+
+                                            if let (Some(tx), Ok(chats)) = (&bcast_tx, store.get_user_chats(user.id).await) {
+                                                for chat in chats {
+                                                    reg.join(chat.id, SessionEntry {
+                                                        session_id:   session_id.clone(),
+                                                             user_id:      user.id,
+                                                             broadcast_tx: tx.clone(),
+                                                    }).await;
+                                                }
+                                            }
+                                            reg.register_user_session(user.id, Arc::clone(&session)).await;
+
+                                            let enc = secure::encrypt(&priv_vtns, json!({
+                                                "event":       "login_ok",
+                                                "pub_at":      pub_at,
+                                                "priv_at":     priv_at,
+                                                "user_id":     user.id,
+                                                "username":    user.name,
+                                                "roles":       role_names,
+                                                "permissions": permissions,
+                                            }).to_string().as_bytes());
+
+                                            let mut s = session.lock().await;
+                                            let _ = s.send_binary(enc).await;
+                                            s.user_id     = Some(user.id);
+                                            s.permissions = permissions;
+                                            s.state       = SessionState::Authenticated {
+                                                pub_at, priv_at, issued_at: Instant::now(),
+                                            };
+                                        }
+                                        Err(code) => {
+                                            let s = session.lock().await;
+                                            let _ = s.send_json(&json!({ "event": "login_failed", "code": code })).await;
                                         }
                                     }
-                                    registry.register_user_session(user.id, Arc::clone(&session)).await;
-
-                                    let enc = secure::encrypt(&priv_vtns, json!({
-                                        "event":       "login_ok",
-                                        "pub_at":      pub_at,
-                                        "priv_at":     priv_at,
-                                        "user_id":     user.id,
-                                        "username":    user.name,
-                                        "roles":       role_names,
-                                        "permissions": permissions,
-                                    }).to_string().as_bytes());
-
-                                    let mut s = session.lock().await;
-                                    let _ = s.send_binary(enc).await;
-                                    s.user_id     = Some(user.id);
-                                    s.permissions = permissions;
-                                    s.state       = SessionState::Authenticated {
-                                        pub_at, priv_at, issued_at: Instant::now(),
-                                    };
                                 }
-                                Err(code) => {
-                                    let s = session.lock().await;
-                                    let _ = s.send_json(&json!({ "event": "login_failed", "code": code })).await;
-                                }
-                            }
-                        }
 
-                        "register" => {
-                            let (username, password, session_id, bcast_tx) = {
-                                let s = session.lock().await;
-                                (
-                                    payload["username"].as_str().unwrap_or("").to_string(),
-                                 payload["password"].as_str().unwrap_or("").to_string(),
-                                 s.id.clone(),
-                                 s.broadcast_tx.clone(),
-                                )
-                            };
+                                "register" => {
+                                    let (username, password) = (
+                                        payload["username"].as_str().unwrap_or("").to_string(),
+                                                                payload["password"].as_str().unwrap_or("").to_string(),
+                                    );
 
-                            let register_result = async {
-                                if username.len() < 3 || username.len() > 32 {
-                                    return Err("invalid_username");
-                                }
-                                if password.len() < 6 {
-                                    return Err("password_too_short");
-                                }
-                                if store.get_user_by_name(&username).await
-                                    .map_err(|_| "db_error")?
-                                    .is_some()
-                                    {
-                                        return Err("username_taken");
+                                    let register_result = async {
+                                        if username.len() < 3 || username.len() > 32 {
+                                            return Err("invalid_username");
+                                        }
+                                        if password.len() < 6 {
+                                            return Err("invalid_password");
+                                        }
+                                        if store.get_user_by_name(&username).await
+                                            .map_err(|_| "db_error")?.is_some()
+                                            {
+                                                return Err("username_taken");
+                                            }
+                                            let hash = secure::hash_password(&password).unwrap_or("".to_string());
+                                        store.insert_user(&username, &hash).await
+                                        .map_err(|e| { error!("register insert_user: {e}"); "db_error" })
+                                    }.await;
+
+                                    match register_result {
+                                        Ok(user) => {
+                                            let pub_at  = secure::get_token(16);
+                                            let priv_at = secure::get_token(32);
+
+                                            let roles        = store.get_user_roles(user.id).await.unwrap_or_default();
+                                            let role_names: Vec<String> = roles.iter().map(|r| r.name.clone()).collect();
+                                            let permissions: Vec<i32>   = crate::db::roles::resolve_permissions(&roles);
+
+                                            let enc = secure::encrypt(&priv_vtns, json!({
+                                                "event":       "register_ok",
+                                                "pub_at":      pub_at,
+                                                "priv_at":     priv_at,
+                                                "user_id":     user.id,
+                                                "username":    user.name,
+                                                "roles":       role_names,
+                                                "permissions": permissions,
+                                            }).to_string().as_bytes());
+
+                                            let mut s = session.lock().await;
+                                            let _ = s.send_binary(enc).await;
+                                            s.user_id     = Some(user.id);
+                                            s.permissions = permissions;
+                                            s.state       = SessionState::Authenticated {
+                                                pub_at, priv_at, issued_at: Instant::now(),
+                                            };
+                                        }
+                                        Err(code) => {
+                                            let s = session.lock().await;
+                                            let _ = s.send_json(&json!({ "event": "register_failed", "code": code })).await;
+                                        }
                                     }
-                                    let hashed = tokio::task::spawn_blocking(move || secure::hash_password(&password))
-                                    .await
-                                    .map_err(|_| "hash_error")?
-                                    .map_err(|_| "hash_error")?;
-                                store.insert_user(&username, &hashed)
-                                .await
-                                .map_err(|_| "db_error")
-                            }.await;
-
-                            match register_result {
-                                Ok(user) => {
-                                    let pub_at  = secure::get_token(16);
-                                    let priv_at = secure::get_token(32);
-
-                                    let roles       = store.get_user_roles(user.id).await.unwrap_or_default();
-                                    let role_names: Vec<String> = roles.iter().map(|r| r.name.clone()).collect();
-                                    let permissions: Vec<i32>   = crate::db::roles::resolve_permissions(&roles);
-
-                                    registry.register_user_session(user.id, Arc::clone(&session)).await;
-
-                                    let enc = secure::encrypt(&priv_vtns, json!({
-                                        "event":       "register_ok",
-                                        "pub_at":      pub_at,
-                                        "priv_at":     priv_at,
-                                        "user_id":     user.id,
-                                        "username":    user.name,
-                                        "roles":       role_names,
-                                        "permissions": permissions,
-                                    }).to_string().as_bytes());
-
-                                    let mut s = session.lock().await;
-                                    let _ = s.send_binary(enc).await;
-                                    s.user_id     = Some(user.id);
-                                    s.permissions = permissions;
-                                    s.state       = SessionState::Authenticated {
-                                        pub_at, priv_at, issued_at: Instant::now(),
-                                    };
                                 }
-                                Err(code) => {
-                                    let s = session.lock().await;
-                                    let _ = s.send_json(&json!({ "event": "register_failed", "code": code })).await;
+
+                                _ => {}
+                            }
+                        }
+
+                        // ----- authenticated -----
+                        StateCtx::Authenticated(priv_at) => {
+                            match decrypt_and_parse(&priv_at, &raw) {
+                                Some((event, payload)) => {
+                                    // ----- инкрементируем счётчик только один раз за сессию -----
+                                    {
+                                        let mut s = session.lock().await;
+                                        if !s.is_authenticated {
+                                            s.is_authenticated = true;
+                                            drop(s);
+                                            srv_state.on_user_authenticated().await;
+                                        }
+                                    }
+                                    router.dispatch(&event, Arc::clone(&session), payload).await;
+                                }
+                                None => {
+                                    let mut s = session.lock().await;
+                                    s.state = SessionState::PrivateOnly(priv_at);
+                                    let _ = s.send_json(&json!({ "event": "reauth_required" })).await;
                                 }
                             }
                         }
-                        _ => {}
-                    }
-                }
 
-                StateCtx::Authenticated(priv_at) => {
-                    match decrypt_and_parse(&priv_at, &raw) {
-                        Some((event, payload)) => {
-                            session.lock().await.is_authenticated = true;
-                            srv_state.on_user_authenticated().await;
-                            router.dispatch(&event, Arc::clone(&session), payload).await;
-                        }
-                        None => {
+                        // ----- private only (reauth) -----
+                        StateCtx::PrivateOnly(priv_at) => {
+                            let expected = secure::token_hash(&priv_at);
+                            let Ok(incoming) = serde_json::from_slice::<Value>(&raw) else { continue };
+                            if incoming["event"].as_str() != Some("reauth") { continue; }
+                            let provided = incoming["hash"].as_str().unwrap_or("");
+
                             let mut s = session.lock().await;
-                            s.state = SessionState::PrivateOnly(priv_at);
-                            let _ = s.send_json(&json!({ "event": "reauth_required" })).await;
+                            if provided == expected {
+                                let new_pub  = secure::get_token(16);
+                                let new_priv = secure::get_token(32);
+                                let enc = secure::encrypt(&priv_at, json!({
+                                    "event": "reauth_ok", "pub_at": new_pub,
+                                }).to_string().as_bytes());
+                                let _ = s.send_binary(enc).await;
+                                s.state = SessionState::Authenticated {
+                                    pub_at: new_pub, priv_at: new_priv, issued_at: Instant::now(),
+                                };
+                            } else {
+                                s.state = SessionState::Entrypoint;
+                                let _ = s.send_json(&json!({ "event": "reauth_failed" })).await;
+                            }
                         }
                     }
                 }
 
-                StateCtx::PrivateOnly(priv_at) => {
-                    let expected = secure::token_hash(&priv_at);
-                    let Ok(incoming) = serde_json::from_slice::<Value>(&raw) else { continue };
-                    if incoming["event"].as_str() != Some("reauth") { continue; }
-                    let provided = incoming["hash"].as_str().unwrap_or("");
-
-                    let mut s = session.lock().await;
-                    if provided == expected {
-                        let new_pub  = secure::get_token(16);
-                        let new_priv = secure::get_token(32);
-                        let enc = secure::encrypt(&priv_at, json!({
-                            "event": "reauth_ok", "pub_at": new_pub,
-                        }).to_string().as_bytes());
-                        let _ = s.send_binary(enc).await;
-                        s.state = SessionState::Authenticated {
-                            pub_at: new_pub, priv_at: new_priv, issued_at: Instant::now(),
-                        };
+                // ----- ping tick -----
+                _ = ping_ticker.tick() => {
+                    if waiting_pong {
+                        if pong_deadline.map_or(true, |d| Instant::now() >= d) {
+                            break;
+                        }
                     } else {
-                        s.state = SessionState::Entrypoint;
-                        let _ = s.send_json(&json!({ "event": "reauth_failed" })).await;
+                        if tx.send(Message::Ping(vec![])).await.is_err() { break; }
+                        // plain JSON — виден в handleText на клиенте без расшифровки
+                        let _ = tx.send(Message::Text(r#"{"event":"ping"}"#.into())).await;
+                        waiting_pong  = true;
+                        pong_deadline = Some(Instant::now() + PONG_TIMEOUT);
                     }
                 }
             }
         }
 
-        { registry.leave(&session.lock().await.id).await; }
-        let is_auth = session.lock().await.is_authenticated;
+        // ----- cleanup -----
+
         registry.leave(&session.lock().await.id).await;
+        let is_auth = session.lock().await.is_authenticated;
         srv_state.on_disconnect().await;
         if is_auth { srv_state.on_user_left().await; }
 
