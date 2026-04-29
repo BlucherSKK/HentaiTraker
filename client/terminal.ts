@@ -1,3 +1,5 @@
+// ----- client/terminal.ts -----
+
 import { HntWsConnection } from "./ws";
 
 declare global {
@@ -9,11 +11,10 @@ declare global {
 
 export class TerminalPage extends HTMLElement {
     private _ws?: HntWsConnection;
-    private _started = false;  // загрузка скрипта началась
+    private _started = false;
 
     get ws(): HntWsConnection | undefined { return this._ws; }
 
-    // app.ts присваивает ws ПОСЛЕ создания элемента — ловим это здесь
     set ws(val: HntWsConnection | undefined) {
         this._ws = val;
         if (val && this.isConnected) {
@@ -23,14 +24,11 @@ export class TerminalPage extends HTMLElement {
 
     connectedCallback() {
         this._renderShell();
-        // на случай если ws уже был присвоен до вставки в DOM (маловероятно, но надёжно)
         if (this._ws) {
             this._start();
         }
     }
 
-    // вызывается из app.ts после ws= — просто ничего не делаем,
-    // загрузка уже идёт через setter
     render() {}
 
     private _renderShell() {
@@ -45,8 +43,9 @@ export class TerminalPage extends HTMLElement {
     }
 
     private async _start() {
+        await Promise.resolve();
+
         if (this._started) {
-            // Скрипт уже загружен, просто переинициализируем UI в новый DOM
             if (window.__TERMINAL_INIT__) {
                 window.__TERMINAL_WS__ = this._ws;
                 window.__TERMINAL_INIT__();
