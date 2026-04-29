@@ -34,14 +34,14 @@ export class AppNav extends HTMLElement {
 
         this.innerHTML = `
         <div class="nav-container">
-        <div class="nav-left">
-        ${btn('dm',    'личка')}
-        ${btn('chats', 'чаты')}
-        ${btn('feeds', 'лента')}
-        ${canPost && page == 'feeds' ? btn('post-create', '+ пост') : ''}
-        ${ page == 'feeds' ? `<button class="nav-btn nav-refresh-btn" id="nav-refresh-btn" title="Обновить ленту">↻</button>
-        </div>` : ""}
-        ${isAdmin ? `<div class="nav-right">${btn('terminal', 'терминал')}</div>` : ''}
+            <div class="nav-left">
+                ${btn('dm',    'личка')}
+                ${btn('chats', 'чаты')}
+                ${btn('feeds', 'лента')}
+                ${canPost && page == 'feeds' ? btn('post-create', '+ пост') : ''}
+                ${ page == 'feeds' ? `<button class="nav-btn nav-refresh-btn" id="nav-refresh-btn" title="Обновить ленту">↻</button>` : ""}
+            </div>
+            ${isAdmin ? `<div class="nav-right">${btn('terminal', 'терминал')}</div>` : ''}
         </div>`;
 
         this._bindRefresh();

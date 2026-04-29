@@ -1,7 +1,10 @@
+/* ----- admin-term/style.css ----- */
 
 .terminal-wrapper {
     padding: 1em;
-    height: calc(100vh - 120px);
+    min-height: 200px;
+    max-height: calc(100vh - 80px);
+    height: auto;
     display: flex;
     flex-direction: column;
 }
@@ -19,15 +22,15 @@
 }
 
 .terminal-output {
-    flex: 1;
-    overflow-y: auto;
     padding: 0.75em 1em;
     display: flex;
     flex-direction: column;
     gap: 2px;
+    overflow-y: auto;
+    max-height: calc(100vh - 160px);
 }
 
-.terminal-output::-webkit-scrollbar { width: 6px; }
+.terminal-output::-webkit-scrollbar       { width: 6px; }
 .terminal-output::-webkit-scrollbar-track { background: #0d0d0d; }
 .terminal-output::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
 
@@ -38,6 +41,7 @@
     padding: 0.5em 1em;
     border-top: 1px solid #222;
     background: #111;
+    flex-shrink: 0;
 }
 
 .terminal-prompt {
@@ -57,8 +61,4 @@ font-size: inherit;
 caret-color: #4ec94e;
 }
 
-.terminal-line   { padding: 1px 0; line-height: 1.45; word-break: break-all; }
-.terminal-output { color: #e0e0e0; }
-.terminal-input  { color: #4ec94e; }
-.terminal-info   { color: #5ab0f7; }
-.terminal-error  { color: #f75a5a; }
+.terminal-line  { padding: 1px 0; line-height: 1.45; word-break: break-all; }
