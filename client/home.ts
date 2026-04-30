@@ -1,5 +1,6 @@
 import { SVG_COMMENT, SVG_LIKE } from "./assets";
 import { bindPostCardClicks, POST_CARD_STYLES, renderPostCard } from "./post-card";
+import { toastSuccess } from "./toast";
 
 
 
@@ -32,7 +33,10 @@ export class HomeNav extends HTMLElement {
 
 export class Feed extends HTMLElement {
 
-    private _boundRefresh = () => this.fetchData();
+    private _boundRefresh = () => {
+        toastSuccess("лента перезагружена");
+        this.fetchData()
+    };
 
     connectedCallback() {
         this._injectStyles();

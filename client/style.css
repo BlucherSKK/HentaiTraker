@@ -332,11 +332,6 @@
 .nav-refresh-btn {
     transition: transform 0.4s;
 }
-
-.nav-refresh-btn:hover {
-    transform: rotate(180deg);
-}
-
 .nav-refresh-btn:active {
     transform: rotate(360deg);
 }
