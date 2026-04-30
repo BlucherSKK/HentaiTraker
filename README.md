@@ -4,7 +4,6 @@
 ### [Помщь проекту](https://github.com/BlucherSKK/HentaiTraker/blob/doc/support_ru.md)
 
 ## English
-
 ### [Disclaimer](https://github.com/BlucherSKK/HentaiTraker/blob/main/DISCLAIMER.txt)
 ### [License](https://github.com/BlucherSKK/HentaiTraker/blob/main/LICENSE.txt)
 ### [Помщь проекту](https://github.com/BlucherSKK/HentaiTraker/blob/doc/support_ru.md)
