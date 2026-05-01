@@ -10,6 +10,7 @@ import { ProfilePage } from "./profile";
 import { TerminalPage } from "./terminal";
 import { PostCreatePage } from "./post-create";
 import { SidebarNews } from './sidebar-news';
+import { SettingsPage, applySettings } from './settings';
 
 declare global {
     interface Window {
@@ -21,23 +22,24 @@ declare global {
 enum Tags { Any, Hentai }
 
 export interface User {
-    name: string;
-    id: string;
-    token: string;
-    roles: string;
-    tagpool: Tags[];
+    name:     string;
+    id:       string;
+    token:    string;
+    roles:    string;
+    tagpool:  Tags[];
+    settings: string | null;
 }
 
 type PageType = 'feeds' | 'projects' | 'settings' | 'login' | 'dm' | 'chats' | 'profile' | 'terminal' | 'post-create';
 
 interface AppState {
-    page: PageType;
+    page:     PageType;
     lastpage: PageType;
-    user?: User;
-    items: string[];
-    init: boolean;
-    db: HntDataBase;
-    ws?: HntWsConnection;
+    user?:    User;
+    items:    string[];
+    init:     boolean;
+    db:       HntDataBase;
+    ws?:      HntWsConnection;
 }
 
 // ----- custom elements -----
@@ -51,6 +53,7 @@ customElements.define('app-profile',      ProfilePage);
 customElements.define('app-terminal',     TerminalPage);
 customElements.define('app-post-create',  PostCreatePage);
 customElements.define('app-sidebar-news', SidebarNews);
+customElements.define('app-settings',     SettingsPage);
 
 // ----- App -----
 
@@ -124,12 +127,16 @@ const App = {
         bindPingIndicator(ws);
 
         const onAuthSuccess = (_ev: string, payload: Record<string, unknown>) => {
+            const rawSettings = (payload.settings as string | null) ?? null;
+            applySettings(rawSettings);
+
             this.state.user = {
-                name:    payload.username as string,
-                id:      String(payload.user_id),
-                token:   payload.pub_at   as string,
-                roles:  (payload.roles as string | null) ?? '',
-                tagpool: [],
+                name:     payload.username as string,
+                id:       String(payload.user_id),
+                token:    payload.pub_at   as string,
+                roles:   (payload.roles as string | null) ?? '',
+                tagpool:  [],
+                settings: rawSettings,
             };
             this.state.page = this.state.lastpage === 'login' ? 'feeds' : this.state.lastpage;
             this.state.init = false;
@@ -200,12 +207,16 @@ const App = {
             const el = hero.querySelector('app-post-create') as PostCreatePage;
             if (el) el.ws = this.state.ws;
         }
+        if (this.state.page === 'settings') {
+            const el = hero.querySelector('app-settings') as SettingsPage;
+            if (el) el.ws = this.state.ws;
+        }
     },
 
     // ----- page slots -----
 
     ensurePages(hero: HTMLElement): void {
-        const pages: PageType[] = ['feeds', 'dm', 'chats', 'login', 'profile', 'terminal', 'post-create'];
+        const pages: PageType[] = ['feeds', 'dm', 'chats', 'login', 'profile', 'terminal', 'post-create', 'settings'];
         for (const page of pages) {
             if (hero.querySelector(`[data-page="${page}"]`)) continue;
 
@@ -219,7 +230,7 @@ const App = {
     },
 
     getPageTemplate(page: PageType): string {
-        const nav = `<app-nav data-link="${page}" data-user-roles="${this.state.user?.roles || ''}"></app-nav>`;
+        const nav = `<app-nav data-link="${page}" data-user-roles="${this.state.user?.roles || ''}" data-user-id="${this.state.user?.id || ''}"></app-nav>`;
         switch (page) {
             case 'feeds': return `
                 ${nav}
@@ -233,6 +244,7 @@ const App = {
             case 'profile':     return `${nav}<app-profile></app-profile>`;
             case 'terminal':    return `${nav}<app-terminal></app-terminal>`;
             case 'post-create': return `${nav}<app-post-create></app-post-create>`;
+            case 'settings': return `${nav}<app-settings></app-settings>`;
             default:            return nav;
         }
     },
@@ -243,6 +255,7 @@ const App = {
         window.addEventListener('app-navigate', (e: Event) => {
             const detail = (e as CustomEvent).detail as { page: string };
             const targetPage = detail.page as PageType;
+            if (targetPage === 'settings' && !this.state.user) return;
             if (targetPage && targetPage !== this.state.page) {
                 this.state.lastpage = this.state.page;
                 this.state.page     = targetPage;

@@ -37,8 +37,8 @@ const TOAST_STYLES = `
     pointer-events: none;
     max-width: 320px;
 }
-.toast-container--top-left     { top: 120px;    left: 1vw; }
-.toast-container--top-right    { top: 120px;    right: 1vw; }
+.toast-container--top-left     { top: 150px;    left: 1vw; }
+.toast-container--top-right    { top: 150px;    right: 1vw; }
 .toast-container--bottom-left  { bottom: 16px; left: 16px; }
 .toast-container--bottom-right { bottom: 16px; right: 16px; }
 

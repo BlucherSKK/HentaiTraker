@@ -1,7 +1,7 @@
 export class AppNav extends HTMLElement {
 
     static get observedAttributes() {
-        return ['data-link', 'data-user-roles'];
+        return ['data-link', 'data-user-roles', 'data-user-id'];
     }
 
     attributeChangedCallback(name: string, oldValue: string, newValue: string) {
@@ -23,10 +23,13 @@ export class AppNav extends HTMLElement {
         const roles    = rolesStr.split(',').map(r => r.trim()).filter(Boolean);
         const isAdmin  = roles.includes('admin');
         const canPost  = roles.some(r => r === 'admin' || r === 'force_posting');
+        const isAuth   = !!this.getAttribute('data-user-id');
         const page     = this.getAttribute('data-link') || 'feeds';
 
         const btn = (link: string, label: string) =>
         `<button class="${page === link ? 'nav-btn-here' : 'nav-btn'}" data-link="${link}">${label}</button>`;
+
+
 
         this.innerHTML = `
         <div class="nav-container">
@@ -37,7 +40,10 @@ export class AppNav extends HTMLElement {
         ${canPost && page === 'feeds' ? btn('post-create', '+ пост') : ''}
         ${page === 'feeds' ? `<button class="nav-btn nav-refresh-btn" id="nav-refresh-btn" title="Обновить ленту">↻</button>` : ''}
         </div>
-        ${isAdmin ? `<div class="nav-right">${btn('terminal', 'терминал')}</div>` : ''}
+        <div class="nav-right">
+        ${isAuth ? btn('settings', 'настройки') : ''}
+        ${isAdmin ? btn('terminal', 'терминал') : ''}
+        </div>
         </div>`;
 
         this._bindRefresh();

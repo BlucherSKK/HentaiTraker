@@ -580,3 +580,72 @@ pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value, srv_state: 
 }
 
 
+// ----- settings_get -----
+
+pub async fn settings_get(session: Arc<Mutex<Session>>, _data: Value) {
+    let (store, user_id) = {
+        let s = session.lock().await;
+        (s.store.clone(), s.user_id)
+    };
+    let store   = match store   { Some(s) => s, None => return };
+    let user_id = match user_id {
+        Some(id) => id,
+        None => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "unauthenticated" })).await;
+            return;
+        }
+    };
+
+    match store.get_settings(user_id).await {
+        Ok(settings) => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "settings_ok", "settings": settings })).await;
+        }
+        Err(e) => {
+            error!("settings_get: {e}");
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+        }
+    }
+}
+
+// ----- settings_update -----
+
+pub async fn settings_update(session: Arc<Mutex<Session>>, data: Value) {
+    let (store, user_id) = {
+        let s = session.lock().await;
+        (s.store.clone(), s.user_id)
+    };
+    let store   = match store   { Some(s) => s, None => return };
+    let user_id = match user_id {
+        Some(id) => id,
+        None => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "unauthenticated" })).await;
+            return;
+        }
+    };
+
+    let settings_str = match data["settings"].as_str() {
+        Some(s) => s.to_string(),
+        None => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "missing_settings" })).await;
+            return;
+        }
+    };
+
+    match store.set_settings(user_id, &settings_str).await {
+        Ok(_) => {
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "settings_saved", "settings": settings_str })).await;
+        }
+        Err(e) => {
+            error!("settings_update: {e}");
+            let s = session.lock().await;
+            s.send_encrypted(&json!({ "event": "error", "code": "db_error" })).await;
+        }
+    }
+}
+

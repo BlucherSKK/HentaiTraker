@@ -315,6 +315,7 @@ pub fn ws(
                                             }
                                             reg.register_user_session(user.id, Arc::clone(&session)).await;
 
+                                            let settings = store.get_settings(user.id).await.unwrap_or(None);
                                             let enc = secure::encrypt(&priv_vtns, json!({
                                                 "event":       "login_ok",
                                                 "pub_at":      pub_at,
@@ -323,6 +324,7 @@ pub fn ws(
                                                 "username":    user.name,
                                                 "roles":       role_names,
                                                 "permissions": permissions,
+                                                "settings":    settings,
                                             }).to_string().as_bytes());
 
                                             let mut s = session.lock().await;

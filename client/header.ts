@@ -60,7 +60,7 @@ export function get_header(page: string, user?: User): string {
     <header class="header">
     <div class="left-pane">
         <img class="logo-img pixelated" src="${LOGO}" alt="Logo"/>
-        <div class="header-actions">
+        <div class="header-actions"></div>
     </div>
     <div class="right-pane">
         <span id="${PING_DOT_ID}" title="WebSocket"></span>
@@ -72,7 +72,6 @@ export function get_header(page: string, user?: User): string {
             <img src="${SVG_LOGIN}"/>
             </a>`
         }
-        </div>
     </div>
     </header>
     `;
