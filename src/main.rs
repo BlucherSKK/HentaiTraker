@@ -10,6 +10,8 @@ use rocket::response::{self, Responder, Response};
 use rocket::{Request, State};
 use tokio::time::Duration;
 
+mod score;
+
 mod db;
 mod handle;
 mod hnts;
