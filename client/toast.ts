@@ -1,3 +1,5 @@
+import { getSettings } from './store';
+
 export type ToastKind = 'info' | 'success' | 'warn' | 'error';
 export type ToastEdge = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
@@ -11,7 +13,6 @@ export interface ToastOptions {
 // ----- container registry -----
 
 const CONTAINER_ID_PREFIX = 'toast-container-';
-const DIRECTION = 'top-right';
 
 function getContainer(edge: ToastEdge): HTMLElement {
     const id = `${CONTAINER_ID_PREFIX}${edge}`;
@@ -37,8 +38,8 @@ const TOAST_STYLES = `
     pointer-events: none;
     max-width: 320px;
 }
-.toast-container--top-left     { top: 150px;    left: 1vw; }
-.toast-container--top-right    { top: 150px;    right: 1vw; }
+.toast-container--top-left     { top: 150px;  left: 1vw; }
+.toast-container--top-right    { top: 150px;  right: 1vw; }
 .toast-container--bottom-left  { bottom: 16px; left: 16px; }
 .toast-container--bottom-right { bottom: 16px; right: 16px; }
 
@@ -94,8 +95,8 @@ export function toast(message: string, options: ToastOptions = {}): void {
 
     const {
         kind     = 'info',
-        edge     = DIRECTION,
-        duration = 350000000,
+        edge     = getSettings().toast_position,
+        duration = 3500,
         title,
     } = options;
 
@@ -118,7 +119,6 @@ export function toast(message: string, options: ToastOptions = {}): void {
     });
 
     const timer = setTimeout(dismiss, duration);
-
     el.addEventListener('click', () => clearTimeout(timer), { once: true });
 }
 

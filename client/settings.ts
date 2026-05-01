@@ -1,35 +1,8 @@
 import { HntWsConnection } from './ws';
-import { toast, toastInfo } from './toast';
+import { toast } from './toast';
+import { getSettings, updateSettings, applySettings, UserSettings } from './store';
 
-// ----- types -----
-
-export type ToastPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-
-export interface UserSettings {
-    toast_position: ToastPosition;
-}
-
-export const DEFAULT_SETTINGS: UserSettings = {
-    toast_position: 'top-right',
-};
-
-// ----- global store -----
-
-let _settings: UserSettings = { ...DEFAULT_SETTINGS };
-
-export function getSettings(): UserSettings {
-    return _settings;
-}
-
-export function applySettings(raw: string | null | undefined): void {
-    if (!raw) { _settings = { ...DEFAULT_SETTINGS }; return; }
-    try {
-        const parsed = JSON.parse(raw);
-        _settings = { ...DEFAULT_SETTINGS, ...parsed };
-    } catch {
-        _settings = { ...DEFAULT_SETTINGS };
-    }
-}
+export { applySettings } from './store';
 
 // ----- styles -----
 
@@ -142,43 +115,40 @@ export class SettingsPage extends HTMLElement {
         const select = this.querySelector<HTMLSelectElement>('#toast-position-select');
         if (!select) return;
 
-        toastInfo("попытка изменения настроек");
-
-        const newSettings: UserSettings = {
-            ...getSettings(),
-            toast_position: select.value as ToastPosition,
+        const patch: Partial<UserSettings> = {
+            toast_position: select.value as UserSettings['toast_position'],
         };
 
-        _settings = newSettings;
+        updateSettings(patch);
 
         const btn = this.querySelector<HTMLButtonElement>('#settings-save-btn');
         if (btn) btn.disabled = true;
 
         if (!this.ws) {
-            toast('Нет соединения', { kind: 'error', edge: getSettings().toast_position });
+            toast('Нет соединения', { kind: 'error' });
             if (btn) btn.disabled = false;
             return;
         }
 
-        const raw = JSON.stringify(newSettings);
+        const raw = JSON.stringify(getSettings());
 
         const unsubOk = this.ws.once('settings_saved', () => {
-            toast('Настройки сохранены', { kind: 'success', edge: getSettings().toast_position });
+            toast('Настройки сохранены', { kind: 'success' });
             if (btn) btn.disabled = false;
         });
 
-        const unsubErr = this.ws.once('error', (_ev, payload) => {
-            toast(`Ошибка: ${payload.code}`, { kind: 'error', edge: getSettings().toast_position });
-            if (btn) btn.disabled = false;
-        });
+            const unsubErr = this.ws.once('error', (_ev, payload) => {
+                toast(`Ошибка: ${payload.code}`, { kind: 'error' });
+                if (btn) btn.disabled = false;
+            });
 
-        try {
-            await this.ws.send('settings_update', { settings: raw });
-        } catch (err) {
-            unsubOk();
-            unsubErr();
-            toast(`Ошибка: ${(err as Error).message}`, { kind: 'error', edge: getSettings().toast_position });
-            if (btn) btn.disabled = false;
-        }
+                try {
+                    await this.ws.send('settings_update', { settings: raw });
+                } catch (err) {
+                    unsubOk();
+                    unsubErr();
+                    toast(`Ошибка: ${(err as Error).message}`, { kind: 'error' });
+                    if (btn) btn.disabled = false;
+                }
     }
 }
