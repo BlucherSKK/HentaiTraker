@@ -58,19 +58,21 @@ export function get_header(page: string, user?: User): string {
     injectHeaderStyles();
     return `
     <header class="header">
-    <div class="right-pane">
-    <img class="logo-img pixelated" src="${LOGO}" alt="Logo"/>
-    <div class="header-actions">
-    <span id="${PING_DOT_ID}" title="WebSocket"></span>
-    ${user
-        ? `<div class="user-container">
-        <span class="profile-btn" data-link="profile">${user.name}</span>
-        </div>`
-        : `<a class="auth-btn" data-link="login">
-        <img src="${SVG_LOGIN}"/>
-        </a>`
-    }
+    <div class="left-pane">
+        <img class="logo-img pixelated" src="${LOGO}" alt="Logo"/>
+        <div class="header-actions">
     </div>
+    <div class="right-pane">
+        <span id="${PING_DOT_ID}" title="WebSocket"></span>
+        ${user
+            ? `<div class="user-container">
+            <span class="profile-btn" data-link="profile">${user.name}</span>
+            </div>`
+            : `<a class="auth-btn" data-link="login">
+            <img src="${SVG_LOGIN}"/>
+            </a>`
+        }
+        </div>
     </div>
     </header>
     `;
