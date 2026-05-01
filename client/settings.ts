@@ -1,5 +1,5 @@
 import { HntWsConnection } from './ws';
-import { toast } from './toast';
+import { toast, toastInfo } from './toast';
 
 // ----- types -----
 
@@ -138,9 +138,11 @@ export class SettingsPage extends HTMLElement {
         this.querySelector('#settings-save-btn')?.addEventListener('click', () => this.save());
     }
 
-    private save() {
+    private async save() {
         const select = this.querySelector<HTMLSelectElement>('#toast-position-select');
         if (!select) return;
+
+        toastInfo("попытка изменения настроек");
 
         const newSettings: UserSettings = {
             ...getSettings(),
@@ -160,16 +162,23 @@ export class SettingsPage extends HTMLElement {
 
         const raw = JSON.stringify(newSettings);
 
-        this.ws.once('settings_saved', () => {
+        const unsubOk = this.ws.once('settings_saved', () => {
             toast('Настройки сохранены', { kind: 'success', edge: getSettings().toast_position });
             if (btn) btn.disabled = false;
         });
 
-            this.ws.once('error', (_ev, payload) => {
-                toast(`Ошибка: ${payload.code}`, { kind: 'error', edge: getSettings().toast_position });
-                if (btn) btn.disabled = false;
-            });
+        const unsubErr = this.ws.once('error', (_ev, payload) => {
+            toast(`Ошибка: ${payload.code}`, { kind: 'error', edge: getSettings().toast_position });
+            if (btn) btn.disabled = false;
+        });
 
-                this.ws.send('settings_update', { settings: raw });
+        try {
+            await this.ws.send('settings_update', { settings: raw });
+        } catch (err) {
+            unsubOk();
+            unsubErr();
+            toast(`Ошибка: ${(err as Error).message}`, { kind: 'error', edge: getSettings().toast_position });
+            if (btn) btn.disabled = false;
+        }
     }
 }

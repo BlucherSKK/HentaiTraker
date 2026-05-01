@@ -179,6 +179,12 @@ pub fn ws(
         router.on("profile_update", |sess, data| async move {
             handlers::profile_update(sess, data).await
         });
+        router.on("settings_get", |sess, data| async move {
+            handlers::settings_get(sess, data).await
+        });
+        router.on("settings_update", |sess, data| async move {
+            handlers::settings_update(sess, data).await
+        });
         {
             let r = Arc::clone(&reg);
             router.on("roles_update", move |sess, data| {
