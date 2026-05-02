@@ -18,12 +18,12 @@ interface ProfileData {
 }
 
 interface PostItem {
-    id:        number;
-    title:     string | null;
-    content:   string;
-    tags:      string | null;
-    files:     string | null;
-    time:      string;
+    id:      number;
+    title:   string | null;
+    content: string;
+    tags:    string | null;
+    files:   string | null;
+    time:    string;
 }
 
 // ----- ProfilePage -----
@@ -32,7 +32,8 @@ export class ProfilePage extends HTMLElement {
     private _ws?: HntWsConnection;
     user?: User;
     private _data: ProfileData | null = null;
-    private _pendingAvatar: string | null = null;
+    private _pendingAvatarFile: File | null = null;
+    private _pendingAvatarPreview: string | null = null;
 
     get ws(): HntWsConnection | undefined { return this._ws; }
     set ws(val: HntWsConnection | undefined) {
@@ -54,12 +55,18 @@ export class ProfilePage extends HTMLElement {
 
         this._ws.once('profile_ok', (_ev, payload) => {
             if (!this.isConnected) return;
+
+            const rawRoles = payload.roles;
+            const rolesStr = Array.isArray(rawRoles)
+            ? (rawRoles as string[]).join(', ')
+            : (rawRoles as string | null) ?? null;
+
             this._data = {
                 id:     payload.id     as number,
                 name:   payload.name   as string,
                 avatar: (payload.avatar ?? null) as string | null,
-                      tags:   (payload.tags  ?? null) as string | null,
-                      roles:  (payload.roles ?? null) as string | null,
+                      tags:   (payload.tags   ?? null) as string | null,
+                      roles:  rolesStr,
             };
             this._renderProfile();
             this._loadPosts();
@@ -83,6 +90,7 @@ export class ProfilePage extends HTMLElement {
     private _renderProfile() {
         if (!this._data) return;
         const d = this._data;
+
         const currentTags = d.tags
         ? d.tags.split(',').map(t => t.trim()).filter(Boolean)
         : [];
@@ -107,8 +115,8 @@ export class ProfilePage extends HTMLElement {
         </div>
         <div class="profile-meta">
         <div class="profile-id">ID: ${d.id}</div>
-        <div class="profile-name">${d.name}</div>
-        ${d.roles ? `<div class="profile-roles">${d.roles}</div>` : ''}
+        <div class="profile-name">${escHtml(d.name)}</div>
+        ${d.roles ? `<div class="profile-roles">${escHtml(d.roles)}</div>` : ''}
         </div>
         </div>
         <div class="profile-section">
@@ -151,21 +159,24 @@ export class ProfilePage extends HTMLElement {
         this.querySelector('#avatar-file')?.addEventListener('change', e => {
             const file = (e.target as HTMLInputElement).files?.[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-                this._pendingAvatar = reader.result as string;
-                const img = this.querySelector('.profile-avatar') as HTMLImageElement;
-                const ph  = this.querySelector('.profile-avatar-placeholder') as HTMLElement;
-                if (img) { img.src = this._pendingAvatar; img.style.display = ''; }
-                if (ph)  { ph.style.display = 'none'; }
-            };
-            reader.readAsDataURL(file);
+
+            if (this._pendingAvatarPreview) URL.revokeObjectURL(this._pendingAvatarPreview);
+
+            this._pendingAvatarFile    = file;
+            this._pendingAvatarPreview = URL.createObjectURL(file);
+
+            const img = this.querySelector('.profile-avatar') as HTMLImageElement;
+            const ph  = this.querySelector('.profile-avatar-placeholder') as HTMLElement;
+            if (img) { img.src = this._pendingAvatarPreview; img.style.display = ''; }
+            if (ph)  { ph.style.display = 'none'; }
         });
 
         this.querySelector('#save-btn')?.addEventListener('click', () => this._save());
     }
 
-    private _save() {
+    // ----- _save -----
+
+    private async _save() {
         if (!this._ws) return;
         const status = this.querySelector('#profile-status') as HTMLElement;
         const btn    = this.querySelector('#save-btn')       as HTMLButtonElement;
@@ -177,7 +188,16 @@ export class ProfilePage extends HTMLElement {
         const tags    = checked.map(el => el.value).join(',');
 
         const payload: Record<string, unknown> = { tags };
-        if (this._pendingAvatar) payload.avatar = this._pendingAvatar;
+
+        if (this._pendingAvatarFile) {
+            try {
+                payload.avatar = await this._uploadAvatar(this._pendingAvatarFile);
+            } catch (err: any) {
+                status.textContent = `Ошибка загрузки аватара: ${err.message}`;
+                btn.disabled = false;
+                return;
+            }
+        }
 
         const cleanup: Array<() => void> = [];
         const done = () => { cleanup.forEach(f => f()); btn.disabled = false; };
@@ -189,7 +209,11 @@ export class ProfilePage extends HTMLElement {
                 this._data.tags   = p.tags   as string | null;
                 this._data.avatar = p.avatar as string | null;
             }
-            this._pendingAvatar = null;
+            if (this._pendingAvatarPreview) {
+                URL.revokeObjectURL(this._pendingAvatarPreview);
+                this._pendingAvatarPreview = null;
+            }
+            this._pendingAvatarFile = null;
             status.textContent = 'Сохранено!';
             setTimeout(() => { if (this.isConnected) status.textContent = ''; }, 2500);
         });
@@ -207,8 +231,32 @@ export class ProfilePage extends HTMLElement {
             if (this.isConnected) status.textContent = `Ошибка: ${err}`;
         });
     }
+
+    // ----- _uploadAvatar -----
+
+    private async _uploadAvatar(file: File): Promise<string> {
+        const token = await new Promise<string>((resolve, reject) => {
+            const unsub = this._ws!.once('upload_token', (_ev, p) => {
+                clearTimeout(timer);
+                resolve(p.token as string);
+            });
+            const timer = setTimeout(() => { unsub(); reject(new Error('upload_token timeout')); }, 8_000);
+            this._ws!.send('get_upload_token', {}).catch(err => { clearTimeout(timer); unsub(); reject(err); });
+        });
+
+        const fd = new FormData();
+        fd.append('token', token);
+        fd.append('file',  file);
+
+        const res  = await fetch('/api/upload', { method: 'POST', body: fd });
+        const json = await res.json() as { url?: string; error?: string };
+        if (json.url) return json.url;
+        throw new Error(json.error ?? 'upload_failed');
+    }
 }
 
+// ----- helpers -----
+
 function escHtml(s: string): string {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
