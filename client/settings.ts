@@ -1,6 +1,6 @@
 import { HntWsConnection } from './ws';
-import { toast } from './toast';
-import { getSettings, updateSettings, applySettings, UserSettings } from './store';
+import { toast, playToastSound } from './toast';
+import { getSettings, updateSettings, UserSettings, ToastSound } from './store';
 
 export { applySettings } from './store';
 
@@ -54,6 +54,21 @@ const SETTINGS_STYLES = `
     font-size: 0.9rem;
     cursor: pointer;
 }
+.settings-sound-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.settings-preview-btn {
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bgc);
+    color: var(--textc);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.settings-preview-btn:hover { opacity: 0.75; }
 .settings-save-btn {
     align-self: flex-end;
     padding: 8px 24px;
@@ -74,6 +89,41 @@ function injectStyles(): void {
     s.id          = 'settings-styles';
     s.textContent = SETTINGS_STYLES;
     document.head.appendChild(s);
+}
+
+// ----- helpers -----
+
+type SoundRow = { id: string; label: string; key: keyof UserSettings };
+
+const SOUND_ROWS: SoundRow[] = [
+    { id: 'sound-info',    label: 'Звук — info',    key: 'toast_sound_info'    },
+{ id: 'sound-success', label: 'Звук — success', key: 'toast_sound_success' },
+{ id: 'sound-warn',    label: 'Звук — warn',    key: 'toast_sound_warn'    },
+{ id: 'sound-error',   label: 'Звук — error',   key: 'toast_sound_error'   },
+];
+
+function soundOptions(current: ToastSound): string {
+    const opts: { value: ToastSound; label: string }[] = [
+        { value: 'none',  label: 'Без звука' },
+        { value: 'soft',  label: 'Мягкий'    },
+        { value: 'sharp', label: 'Резкий'    },
+    ];
+    return opts.map(o =>
+    `<option value="${o.value}" ${current === o.value ? 'selected' : ''}>${o.label}</option>`
+    ).join('');
+}
+
+function soundRow(row: SoundRow, current: ToastSound): string {
+    return `
+    <div class="settings-row">
+    <span class="settings-label">${row.label}</span>
+    <div class="settings-sound-controls">
+    <select class="settings-select" id="${row.id}-select">
+    ${soundOptions(current)}
+    </select>
+    <button class="settings-preview-btn" id="${row.id}-preview">▶</button>
+    </div>
+    </div>`;
 }
 
 // ----- component -----
@@ -103,52 +153,65 @@ export class SettingsPage extends HTMLElement {
         <option value="bottom-right" ${cur.toast_position === 'bottom-right' ? 'selected' : ''}>Снизу справа</option>
         </select>
         </div>
+        ${SOUND_ROWS.map(row => soundRow(row, cur[row.key] as ToastSound)).join('')}
         </div>
         <button class="settings-save-btn" id="settings-save-btn">Сохранить</button>
         </div>
         `;
 
+        SOUND_ROWS.forEach(row => {
+            this.querySelector(`#${row.id}-preview`)?.addEventListener('click', () => {
+                const sel = this.querySelector<HTMLSelectElement>(`#${row.id}-select`);
+                if (sel) playToastSound(sel.value as ToastSound);
+            });
+        });
+
         this.querySelector('#settings-save-btn')?.addEventListener('click', () => this.save());
     }
 
     private async save() {
-        const select = this.querySelector<HTMLSelectElement>('#toast-position-select');
-        if (!select) return;
+        const posSelect = this.querySelector<HTMLSelectElement>('#toast-position-select');
+        if (!posSelect) return;
 
         const patch: Partial<UserSettings> = {
-            toast_position: select.value as UserSettings['toast_position'],
+            toast_position: posSelect.value as UserSettings['toast_position'],
         };
 
-        updateSettings(patch);
-
-        const btn = this.querySelector<HTMLButtonElement>('#settings-save-btn');
-        if (btn) btn.disabled = true;
-
-        if (!this.ws) {
-            toast('Нет соединения', { kind: 'error' });
-            if (btn) btn.disabled = false;
-            return;
-        }
-
-        const raw = JSON.stringify(getSettings());
-
-        const unsubOk = this.ws.once('settings_saved', () => {
-            toast('Настройки сохранены', { kind: 'success' });
-            if (btn) btn.disabled = false;
+        SOUND_ROWS.forEach(row => {
+            const sel = this.querySelector<HTMLSelectElement>(`#${row.id}-select`);
+            if (sel) (patch as any)[row.key] = sel.value as ToastSound;
         });
 
-            const unsubErr = this.ws.once('error', (_ev, payload) => {
-                toast(`Ошибка: ${payload.code}`, { kind: 'error' });
+            updateSettings(patch);
+
+            const btn = this.querySelector<HTMLButtonElement>('#settings-save-btn');
+            if (btn) btn.disabled = true;
+
+            if (!this.ws) {
+                toast('Нет соединения', { kind: 'error' });
+                if (btn) btn.disabled = false;
+                return;
+            }
+
+            const raw = JSON.stringify(getSettings());
+
+            const unsubOk = this.ws.once('settings_saved', () => {
+                toast('Настройки сохранены', { kind: 'success' });
                 if (btn) btn.disabled = false;
             });
 
-                try {
-                    await this.ws.send('settings_update', { settings: raw });
-                } catch (err) {
-                    unsubOk();
-                    unsubErr();
-                    toast(`Ошибка: ${(err as Error).message}`, { kind: 'error' });
+                const unsubErr = this.ws.once('error', (_ev, payload) => {
+                    toast(`Ошибка: ${payload.code}`, { kind: 'error' });
                     if (btn) btn.disabled = false;
-                }
+                });
+
+                    try {
+                        await this.ws.send('settings_update', { settings: raw });
+                    } catch (err) {
+                        unsubOk();
+                        unsubErr();
+                        toast(`Ошибка: ${(err as Error).message}`, { kind: 'error' });
+                        if (btn) btn.disabled = false;
+                    }
     }
 }
