@@ -19,8 +19,8 @@ mod secure;
 
 mod admin;
 
-mod upload;
-use upload::UploadTokenStore;
+mod lfs;
+use lfs::UploadTokenStore;
 
 use db::Store;
 use handle::registry::SessionRegistry;
@@ -142,7 +142,7 @@ async fn main() {
     dotenvy::dotenv().ok();
     env_logger::init();
 
-    tokio::fs::create_dir_all(upload::UPLOADS_DIR)
+    tokio::fs::create_dir_all(lfs::UPLOADS_DIR)
     .await
     .expect("cannot create uploads dir");
 
@@ -166,7 +166,7 @@ async fn main() {
     .manage(UploadTokenStore::new())
     .manage(admin::metric::ServerState::new())
     .mount("/",         routes![index, app_js, app_map, terminal_js])
-    .mount("/api", routes![get_feed, upload::upload, upload::serve_file, upload::delete_file, get_sidebar_news, get_post])
+    .mount("/api", routes![get_feed, lfs::upload, lfs::serve_file, lfs::delete_file, get_sidebar_news, get_post])
     .mount("/api/hnts", routes![hnts::get_token, handle::socket::ws])
     .launch()
     .await

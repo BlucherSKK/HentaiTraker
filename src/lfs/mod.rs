@@ -61,8 +61,6 @@ fn allowed_ext(ct: &ContentType) -> Option<&'static str> {
         ("image", "gif")                => Some("gif"),
         ("image", "webp")               => Some("webp"),
         ("video", "mp4")                => Some("mp4"),
-        ("application", "pdf")          => Some("pdf"),
-        ("application", "zip")          => Some("zip"),
         ("application", "x-bittorrent") => Some("torrent"),
         _                               => None,
     }
