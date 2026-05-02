@@ -16,7 +16,10 @@ use crate::secure;
 const TOKEN_TTL_SECS: u64  = 300;
 pub const UPLOADS_DIR: &str = "./uploads";
 
-// ─── Upload token store ───────────────────────────────────────────────────────
+const LIMIT_IMAGE: u64 = 20  * 1024 * 1024;
+const LIMIT_LARGE: u64 = 200 * 1024 * 1024;
+
+// ----- upload token store -----
 
 pub struct UploadTokenStore {
     inner: RwLock<HashMap<String, (i32, Instant)>>,
@@ -44,7 +47,7 @@ impl UploadTokenStore {
     }
 }
 
-// ─── Multipart form ───────────────────────────────────────────────────────────
+// ----- multipart form -----
 
 #[derive(FromForm)]
 pub struct UploadForm<'v> {
@@ -52,21 +55,23 @@ pub struct UploadForm<'v> {
     pub file:  TempFile<'v>,
 }
 
-// ─── Разрешённые типы файлов ──────────────────────────────────────────────────
+// ----- allowed file types -----
 
-fn allowed_ext(ct: &ContentType) -> Option<&'static str> {
+enum FileKind { Image, Large }
+
+fn allowed_ext(ct: &ContentType) -> Option<(&'static str, FileKind)> {
     match (ct.top().as_str(), ct.sub().as_str()) {
-        ("image", "jpeg")               => Some("jpg"),
-        ("image", "png")                => Some("png"),
-        ("image", "gif")                => Some("gif"),
-        ("image", "webp")               => Some("webp"),
-        ("video", "mp4")                => Some("mp4"),
-        ("application", "x-bittorrent") => Some("torrent"),
-        _                               => None,
+        ("image", "jpeg") => Some(("jpg",     FileKind::Image)),
+        ("image", "png")  => Some(("png",     FileKind::Image)),
+        ("image", "webp") => Some(("webp",    FileKind::Image)),
+        ("image", "gif")  => Some(("gif",     FileKind::Large)),
+        ("video", "mp4")  => Some(("mp4",     FileKind::Large)),
+        ("application", "x-bittorrent") => Some(("torrent", FileKind::Large)),
+        _ => None,
     }
 }
 
-// ─── POST /api/upload ─────────────────────────────────────────────────────────
+// ----- POST /api/upload -----
 
 #[post("/upload", data = "<form>")]
 pub async fn upload(
@@ -84,15 +89,25 @@ pub async fn upload(
     }
 
     let ct = form.file.content_type().cloned().unwrap_or(ContentType::Binary);
-    let ext = match allowed_ext(&ct) {
-        Some(e) => e,
+    let (ext, kind) = match allowed_ext(&ct) {
+        Some(v) => v,
         None    => err!(Status::BadRequest, "unsupported_file_type"),
     };
+
+    let size_limit = match kind {
+        FileKind::Image => LIMIT_IMAGE,
+        FileKind::Large => LIMIT_LARGE,
+    };
+
+    if let Some(size) = Some(form.file.len()) {
+        if size > size_limit {
+            err!(Status::PayloadTooLarge, "file_too_large");
+        }
+    }
 
     let filename = format!("{}.{}", secure::get_token(16), ext);
     let dest     = Path::new(UPLOADS_DIR).join(&filename);
 
-    // ----- копируем через tokio чтобы избежать cross-device link (os error 18) -----
     let tmp_path = match form.file.path() {
         Some(p) => p.to_path_buf(),
         None    => err!(Status::InternalServerError, "no_temp_path"),
@@ -107,7 +122,7 @@ pub async fn upload(
     (Status::Ok, RawJson(json!({ "url": url, "filename": filename }).to_string()))
 }
 
-// ─── DELETE /api/files/<n> ────────────────────────────────────────────────────
+// ----- DELETE /api/files/<name> -----
 
 #[rocket::delete("/files/<name>")]
 pub async fn delete_file(name: &str) -> Status {
@@ -125,7 +140,7 @@ pub async fn delete_file(name: &str) -> Status {
     }
 }
 
-// ─── GET /api/files/<n> ───────────────────────────────────────────────────────
+// ----- GET /api/files/<n> -----
 
 #[get("/files/<n>")]
 pub async fn serve_file(n: &str) -> Option<NamedFile> {

@@ -14,7 +14,7 @@ use super::handlers;
 use crate::hnts::HntsState;
 use crate::db::Store;
 use crate::secure;
-use crate::upload::UploadTokenStore;
+use crate::lfs::UploadTokenStore;
 use crate::admin::metric;
 
 // ----- constants -----

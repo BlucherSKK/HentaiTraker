@@ -3,7 +3,7 @@ use tokio::sync::Mutex;
 use serde_json::{Value, json};
 use super::session::Session;
 use super::registry::{SessionRegistry, SessionEntry};
-use crate::upload::UploadTokenStore;
+use crate::lfs::UploadTokenStore;
 use crate::admin;
 use crate::admin::metric;
 use crate::db::roles::{resolve_permissions, role_names, Permission};
