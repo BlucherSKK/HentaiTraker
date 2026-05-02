@@ -10,7 +10,7 @@ use rocket::response::{self, Responder, Response};
 use rocket::{Request, State};
 use tokio::time::Duration;
 
-mod score;
+//mod score;
 
 mod db;
 mod handle;
@@ -104,6 +104,23 @@ async fn get_feed(store: &State<Arc<Store>>) -> RawJson<String> {
 }
 use admin::metric;
 
+// ----- posts -----
+
+#[get("/post/<id>")]
+async fn get_post(store: &State<Arc<Store>>, id: i32) -> (rocket::http::Status, RawJson<String>) {
+    match store.get_post_by_id(id).await {
+        Ok(Some(post)) => (
+            rocket::http::Status::Ok,
+            RawJson(serde_json::to_string(&post).unwrap_or_else(|_| "null".into())),
+        ),
+        Ok(None) => (rocket::http::Status::NotFound, RawJson(r#"{"error":"not_found"}"#.into())),
+        Err(e) => {
+            error!("get_post: {e}");
+            (rocket::http::Status::InternalServerError, RawJson(r#"{"error":"db_error"}"#.into()))
+        }
+    }
+}
+
 #[get("/sidebar-news")]
 async fn get_sidebar_news(
     store:     &State<Arc<Store>>,
@@ -149,7 +166,7 @@ async fn main() {
     .manage(UploadTokenStore::new())
     .manage(admin::metric::ServerState::new())
     .mount("/",         routes![index, app_js, app_map, terminal_js])
-    .mount("/api", routes![get_feed, upload::upload, upload::serve_file, upload::delete_file, get_sidebar_news])
+    .mount("/api", routes![get_feed, upload::upload, upload::serve_file, upload::delete_file, get_sidebar_news, get_post])
     .mount("/api/hnts", routes![hnts::get_token, handle::socket::ws])
     .launch()
     .await

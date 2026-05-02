@@ -11,6 +11,7 @@ import { TerminalPage } from "./terminal";
 import { PostCreatePage } from "./post-create";
 import { SidebarNews } from './sidebar-news';
 import { SettingsPage, applySettings } from './settings';
+import { PostPage } from "./post-page";
 
 declare global {
     interface Window {
@@ -30,7 +31,7 @@ export interface User {
     settings: string | null;
 }
 
-type PageType = 'feeds' | 'projects' | 'settings' | 'login' | 'dm' | 'chats' | 'profile' | 'terminal' | 'post-create';
+type PageType = 'feeds' | 'projects' | 'settings' | 'login' | 'dm' | 'chats' | 'profile' | 'terminal' | 'post-create' | 'post-page';
 
 interface AppState {
     page:     PageType;
@@ -40,6 +41,7 @@ interface AppState {
     init:     boolean;
     db:       HntDataBase;
     ws?:      HntWsConnection;
+    postId?:  number;
 }
 
 // ----- custom elements -----
@@ -54,6 +56,7 @@ customElements.define('app-terminal',     TerminalPage);
 customElements.define('app-post-create',  PostCreatePage);
 customElements.define('app-sidebar-news', SidebarNews);
 customElements.define('app-settings',     SettingsPage);
+customElements.define('app-post-page', PostPage);
 
 // ----- App -----
 
@@ -211,12 +214,16 @@ const App = {
             const el = hero.querySelector('app-settings') as SettingsPage;
             if (el) el.ws = this.state.ws;
         }
+        if (this.state.page === 'post-page') {
+            const el = hero.querySelector('app-post-page') as PostPage;
+            if (el) el.postId = this.state.postId ?? null;
+        }
     },
 
     // ----- page slots -----
 
     ensurePages(hero: HTMLElement): void {
-        const pages: PageType[] = ['feeds', 'dm', 'chats', 'login', 'profile', 'terminal', 'post-create', 'settings'];
+        const pages: PageType[] = ['feeds', 'dm', 'chats', 'login', 'profile', 'terminal', 'post-create', 'settings', 'post-page'];
         for (const page of pages) {
             if (hero.querySelector(`[data-page="${page}"]`)) continue;
 
@@ -245,6 +252,7 @@ const App = {
             case 'terminal':    return `${nav}<app-terminal></app-terminal>`;
             case 'post-create': return `${nav}<app-post-create></app-post-create>`;
             case 'settings': return `${nav}<app-settings></app-settings>`;
+            case 'post-page': return `${nav}<app-post-page></app-post-page>`;
             default:            return nav;
         }
     },
@@ -253,13 +261,14 @@ const App = {
 
     initNavigation(): void {
         window.addEventListener('app-navigate', (e: Event) => {
-            const detail = (e as CustomEvent).detail as { page: string };
+            const detail    = (e as CustomEvent).detail as { page: string; postId?: number };
             const targetPage = detail.page as PageType;
             if (targetPage === 'settings' && !this.state.user) return;
-            if (targetPage && targetPage !== this.state.page) {
+            if (targetPage) {
                 this.state.lastpage = this.state.page;
                 this.state.page     = targetPage;
-                history.pushState({ page: targetPage }, '', `/#${targetPage}`);
+                if (detail.postId != null) this.state.postId = detail.postId;
+                history.pushState({ page: targetPage, postId: detail.postId }, '', `/#${targetPage}`);
                 this.render();
             }
         });
@@ -280,7 +289,8 @@ const App = {
         });
 
         window.addEventListener('popstate', (e: PopStateEvent) => {
-            this.state.page = e.state?.page || 'feeds';
+            this.state.page   = e.state?.page   || 'feeds';
+            this.state.postId = e.state?.postId ?? undefined;
             this.render();
         });
     },
