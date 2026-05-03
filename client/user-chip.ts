@@ -125,7 +125,11 @@ export class UserChip extends HTMLElement {
 
     private _renderFromCache(): void {
         const cache = getProfileCache();
-        if (cache) this._render(cache);
+        if (cache) {
+            this._render(cache);
+        } else {
+            this._renderFromAttrs();
+        }
     }
 
     private _renderFromAttrs(): void {
