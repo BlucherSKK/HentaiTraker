@@ -12,6 +12,7 @@ import { PostCreatePage } from "./post-create";
 import { SidebarNews } from './sidebar-news';
 import { SettingsPage, applySettings } from './settings';
 import { PostPage } from "./post-page";
+import { UserChip } from "./user-chip";
 
 declare global {
     interface Window {
@@ -57,7 +58,7 @@ customElements.define('app-post-create',  PostCreatePage);
 customElements.define('app-sidebar-news', SidebarNews);
 customElements.define('app-settings',     SettingsPage);
 customElements.define('app-post-page', PostPage);
-
+customElements.define('user-chip', UserChip);
 // ----- App -----
 
 const App = {
@@ -140,6 +141,7 @@ const App = {
                 roles:   (payload.roles as string | null) ?? '',
                 tagpool:  [],
                 settings: rawSettings,
+                score:  (payload.score ?? 0) as number,
             };
             this.state.page = this.state.lastpage === 'login' ? 'feeds' : this.state.lastpage;
             this.state.init = false;

@@ -27,7 +27,14 @@
 }
 
 
-/* Добавить в client/style.css */
+
+.user-container user-chip {
+    cursor: pointer;
+}
+
+.user-container user-chip:hover {
+    border-color: var(--accentc);
+}
 
 .profile-btn, .profile-btn:active {
    color: blue;
@@ -45,6 +52,8 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    max-height: 85vh;
+    overflow: scroll;
 }
 
 .profile-posts-header {

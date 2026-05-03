@@ -154,7 +154,8 @@ pub async fn profile_get(session: Arc<Mutex<Session>>, data: Value) {
         "avatar":      user.avatar,
         "tags":        user.tags,
         "roles":       role_names(&roles),
-                            "permissions": permissions,
+        "permissions": permissions,
+        "score":       user.score,
     })).await;
 }
 
@@ -214,7 +215,8 @@ pub async fn profile_update(session: Arc<Mutex<Session>>, data: Value) {
         "avatar":      user.avatar,
         "tags":        user.tags,
         "roles":       role_names(&roles),
-                            "permissions": permissions,
+        "permissions": permissions,
+        "score":       user.score,
     })).await;
 }
 

@@ -28,6 +28,7 @@ pub struct User {
     pub avatar:     Option<String>,
     pub tags:       Option<String>,
     pub settings:   Option<String>,
+    pub score:      i64,
 }
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]

@@ -15,6 +15,7 @@ interface ProfileData {
     avatar: string | null;
     tags:   string | null;
     roles:  string | null;
+    score:  number;
 }
 
 interface PostItem {
@@ -65,8 +66,9 @@ export class ProfilePage extends HTMLElement {
                 id:     payload.id     as number,
                 name:   payload.name   as string,
                 avatar: (payload.avatar ?? null) as string | null,
-                      tags:   (payload.tags   ?? null) as string | null,
-                      roles:  rolesStr,
+                tags:   (payload.tags   ?? null) as string | null,
+                roles:  rolesStr,
+                score:  (payload.score ?? 0) as number,
             };
             this._renderProfile();
             this._loadPosts();
