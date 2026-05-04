@@ -1,39 +1,133 @@
+/* ----- variables ----- */
+
 :root {
-    --bgc: #bfbfbf;
-    --textc: #111111;
-    --ltextc: #7d7d7d;
-    --accentc: #007bff;
-    --border: #FF9CE9;
-    --bg-nav: lightslategray;
+    --bgc:         #bfbfbf;
+    --textc:       #111111;
+    --ltextc:      #7d7d7d;
+    --accentc:     #007bff;
+    --border:      gray;
+    --bg-nav:      lightslategray;
     --bg-nav-hover: lightpink;
-    --border: gray;
-    --bg-post-hov: gray;
-    --alt-bg: #afafaf;
+    --alt-bg:      #afafaf;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --f-bg: #242324;
-        --f-a-bg: #403f40;
-        --f-f-bg: #8e8e8e;
-        --bgc: #111111;
-        --textc: #eeeeee;
-        --ltextc: #bfbfbf;
-        --accentc: #375a7f;
-        --border: #D10092;
-        --bg-nav: gray;
+        --f-bg:        #242324;
+        --f-a-bg:      #403f40;
+        --bgc:         #111111;
+        --textc:       #eeeeee;
+        --ltextc:      #bfbfbf;
+        --accentc:     #375a7f;
+        --border:      gray;
+        --bg-nav:      gray;
         --bg-nav-hover: pink;
-        --border: gray;
-        --bg-post-hov: gray;
-        --alt-bg: #303030;
+        --alt-bg:      #303030;
     }
 }
 
+/* ----- base ----- */
+
 body {
-    background-color: #222; /* Темный фон как на скриншоте */
+    margin: 0;
     font-family: sans-serif;
+    background-color: #222;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
-/* ----- tab buttons row ----- */
+
+.pixelated {
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+}
+
+/* ----- layout ----- */
+
+#apphero {
+display: flex;
+flex-direction: column;
+flex: 1;
+min-height: 0;
+}
+
+.page-slot {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.window {
+    background-color: #2b2b2b;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+/* ----- custom elements stretch ----- */
+
+app-chats, app-feed, app-profile, app-terminal,
+app-post-create, app-settings, app-post-page, app-auth {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+/* ----- header ----- */
+
+.header {
+    background: linear-gradient(black, darkolivegreen);
+    border-bottom: 10px darkorchid ridge;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+}
+
+.logo-img {
+    height: 100px;
+    width: auto;
+    display: block;
+}
+
+.user-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-container user-chip {
+    cursor: pointer;
+}
+
+.user-container user-chip:hover {
+    box-shadow: 0px 5px 5px 0px black;
+}
+
+.auth-btn {
+    border: none;
+    border-radius: 0.5em;
+    background: transparent;
+    cursor: pointer;
+}
+
+.auth-btn img {
+    width: 24px;
+    filter: brightness(0) invert(1);
+    margin-top: 4px;
+}
+
+.auth-btn:hover {
+    border: pink solid;
+}
+
+/* ----- nav tab buttons ----- */
 
 .f-tab-btns {
     display: flex;
@@ -55,7 +149,7 @@ body {
     cursor: pointer;
     background: linear-gradient(to bottom, #5a5a5a 0%, #3a3a3a 100%);
     color: #ccc;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
     transition: filter 0.1s;
 }
 
@@ -74,17 +168,20 @@ body {
     cursor: pointer;
     background: var(--f-a-bg);
     color: #e8c97a;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.window {
-    background-color: #2b2b2b;
-    width: 100%;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
+/* ----- nav refresh btn ----- */
+
+.nav-refresh-btn {
+    transition: transform 0.4s;
 }
+
+.nav-refresh-btn:active {
+    transform: rotate(360deg);
+}
+
+/* ----- f-tab (серая подложка) ----- */
 
 .f-tab {
     background: #8e8e8e;
@@ -96,116 +193,134 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
+
+/* ----- f-tab-in (тело контента) ----- */
 
 .f-tab-in {
     background-color: var(--f-bg);
     border: 1px solid #1a1a1a;
     padding: 16px;
     box-sizing: border-box;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
     flex: 1;
-}
-
-/* ----- f-tab nav groups ----- */
-.f-tab-left {
     display: flex;
-    flex-direction: row;
-    gap: 3px;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
 }
 
-.f-tab-right {
+/* ----- loader ----- */
+
+.loader {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--alt-bg);
+    border-top-color: var(--accentc);
+    border-radius: 50%;
+    margin: 2em auto;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ----- hero notification ----- */
+
+.center-hero-noty {
     display: flex;
-    flex-direction: row;
-    gap: 3px;
-}
-
-.tabs-container {
-    display: flex;
-    gap: 4px;
-    background: #333; /* Цвет подложки */
-    padding: 10px 10px 0 10px;
-    border-bottom: 2px solid #1a1a1a;
-}
-
-.tab {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px 4px 0 0; /* Скругление только сверху */
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    position: relative;
-    transition: all 0.2s ease;
-
-    /* Основной градиент для неактивных кнопок */
-    background: linear-gradient(to bottom, #999 0%, #666 100%);
-    color: #000;
-
-    /* Эффект объема (внутренняя светлая линия сверху и тень снизу) */
-    box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    0 2px 4px rgba(0, 0, 0, 0.3);
-    border: 1px solid #444;
-}
-
-/* Стиль для активной вкладки */
-.tab.active {
-    background: #4a4238; /* Темно-коричневый оттенок */
-    color: #ffcc66;      /* Песочно-желтый текст */
-    border: 1px solid #5a5044;
-    border-bottom: 2px solid #4a4238; /* Перекрывает линию контейнера */
-    margin-bottom: -2px; /* Чтобы "приклеиться" к нижней рамке */
-
-    /* Убираем яркие блики для активной кнопки */
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
-}
-
-/* Эффект при наведении */
-.tab:hover:not(.active) {
-    background: linear-gradient(to bottom, #aaa 0%, #777 100%);
-}
-
-.user-container user-chip {
-    cursor: pointer;
-}
-
-.user-container user-chip:hover {
-    box-shadow: 0px 5px 5px 0px black;
-}
-
-.profile-posts-section {
+    justify-content: center;
     width: 100%;
-    max-width: 520px;
-    margin: 0 auto;
+    height: 20em;
+    align-items: center;
+}
+
+.hero-noty {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    max-height: 85vh;
-    overflow: scroll;
+    border: 5px white solid;
+    border-radius: 1em;
+    justify-content: center;
+    width: 20%;
+    align-items: center;
+    padding: 2em;
 }
 
-.profile-posts-header {
-    font-size: 0.85em;
-    font-weight: bold;
-    color: var(--ltextc);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 0 0.2em;
-}
+/* ----- feeds layout ----- */
 
-.profile-posts-list {
+.feeds-layout {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    flex-direction: row;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
-.profile-posts-loading,
-.profile-posts-empty {
-    font-size: 0.9em;
-    color: var(--ltextc);
-    padding: 1em 0;
+.feeds-layout app-feed {
+    flex: 0 0 40vw;
+    min-width: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
+
+/* ----- post card ----- */
+
+.post-card,
+.post-card:active {
+    border: var(--border) solid;
+    border-radius: 2em;
+    padding: 1em;
+    margin: 1em;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.post-card:hover {
+    background-color: var(--alt-bg);
+    border: pink solid;
+}
+
+.post-img {
+    max-width: 25%;
+    object-fit: contain;
+    margin-bottom: 0.5em;
+}
+
+.post-text {
+    flex: 1;
+    min-height: 3em;
+    overflow: hidden;
+}
+
+.post-text-body {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.5;
+    max-height: 3em;
+}
+
+.post-info {
+    display: flex;
+    flex-direction: row;
+    gap: 1em;
+}
+
+.post-info img {
+    width: 18px;
+    height: 18px;
+    margin: 1em -1em 1em 0;
+    filter: brightness(0) invert(1);
+}
+
+/* ----- profile card preview posts ----- */
 
 .pp-card {
     background: var(--alt-bg);
@@ -255,20 +370,6 @@ body {
     color: var(--ltextc);
 }
 
-/* ----- feeds layout ----- */
-
-.feeds-layout {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-start;
-    width: 100%;
-}
-
-.feeds-layout app-feed {
-    flex: 1;
-    min-width: 0;
-}
-
 .pp-content {
     font-size: 0.88em;
     color: var(--textc);
@@ -295,41 +396,40 @@ body {
     border: 1px solid var(--border);
 }
 
-.nav-container {
+.profile-posts-section {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
     display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: stretch;
-    padding-left: 1%;
-    padding-right: 1%;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 85vh;
+    overflow: scroll;
 }
 
-.nav-left {
+.profile-posts-header {
+    font-size: 0.85em;
+    font-weight: bold;
+    color: var(--ltextc);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0 0.2em;
+}
+
+.profile-posts-list {
     display: flex;
-    flex-direction: row;
-    gap: 1rem;
+    flex-direction: column;
+    gap: 10px;
 }
 
-.nav-right {
-    display: flex;
-    flex-direction: row;
-    gap: 1rem;
+.profile-posts-loading,
+.profile-posts-empty {
+    font-size: 0.9em;
+    color: var(--ltextc);
+    padding: 1em 0;
 }
 
-/* Стилизация кнопок */
-.nav-btn {
-    padding: 0 20px;
-    font-size: 16px;
-    cursor: pointer;
-    border: 5px lightgray inset;
-    background-color: var(--bg-nav);
-    color: white;
-    transition: background-color 0.3s;
-    border-top: none;
-}
-
-
-/* Chats style */
+/* ----- chats ----- */
 
 .chat-container {
     display: flex;
@@ -407,220 +507,7 @@ body {
     background: #f0f0f0;
 }
 
-.nav-btn:hover {
-    background-color: #0056b3;
-}
-
-.nav-btn-here {
-    padding: 0 20px;
-    font-size: 16px;
-    cursor: pointer;
-    border: 5px lightgoldenrodyellow inset;
-    border-top: none;
-    background-color: darkolivegreen;
-    color: white;
-    transition: background-color 0.3s;
-}
-
-
-.loader {
-    width: 48px;
-    height: 48px;
-    border: 4px solid var(--alt-bg);
-    border-top-color: var(--accentc);
-    border-radius: 50%;
-    margin: 2em auto;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-.hero-noty {
-    display: flex;
-    flex-direction: column;
-    border: 5px white solid;
-    border-radius: 1em;
-    justify-content: center;
-    width: 20%;
-    align-items: center;
-    padding: 2em;
-}
-
-.center-hero-noty {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    height: 20em;
-    align-items: center;
-}
-
-.feed {
-    width: 40%;
-    height: auto;
-    max-height: 59rem;
-    margin: 0 auto;
-    border: red solid;
-    overflow: scroll;
-}
-
-/* ----- nav refresh btn ----- */
-
-.nav-refresh-btn {
-    transition: transform 0.4s;
-}
-.nav-refresh-btn:active {
-    transform: rotate(360deg);
-}
-
-.header {
-    background: linear-gradient(black, darkolivegreen);
-    border-bottom: 10px darkorchid ridge;
-    display: flex;
-    flex-direction: row;
-
-    /* Добавляем эти свойства: */
-    justify-content: space-between; /* Логотип слева, кнопки справа */
-    align-items: center;            /* Центрирование по вертикали */
-    padding: 0 20px;               /* Отступы по бокам, чтобы не прилипало к краям */
-}
-
-/* Стили для контейнера с кнопками/пользователем */
-.header-actions {
-    display: flex;
-    /* Выравниваем элементы внутри блока по горизонтали */
-    align-items: center;
-    /* Прижимаем весь блок вниз контейнера .header */
-    align-self: flex-end;
-    /* Отступ снизу 5% от высоты хедера */
-    margin-bottom: 1%;
-}
-
-/* Чтобы кнопки входа/регистрации или данные профиля стояли в ряд */
-.user-container {
-    gap: 15px;      /* Расстояние между кнопками */
-}
-
-.auth-btn {
-    border: none;
-    border-radius: 0.5em;
-}
-
-.auth-btn img {
-    width: 24px;
-    filter: brightness(0) invert(1);
-    margin-top: 4px;
-}
-
-.auth-btn:hover {
-    border: pink solid;
-}
-
-
-.logo-img {
-    height: 100px;
-    width: auto;
-    display: block;
-}
-
-nav {
-    display: flex;
-    /* Выстраиваем дочерние элементы вертикально (друг под другом) */
-    flex-direction: column;
-
-    /* Центрируем элементы по горизонтали */
-    align-items: center;
-
-    /* Прижимаем элементы к верху по вертикали */
-    justify-content: flex-start;
-
-    /* Дополнительные стили для наглядности */
-    min-height: 40%;
-    padding: 20px;
-    gap: 15px; /* Отступ между внутренними контейнерами */
-}
-nav div {
-    color: white;
-    text-decoration: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    transition: 0.3s;
-    font-size: 14px;
-}
-
-.post-card, .post-card:active {
-    border: var(--border) solid;
-    border-radius: 2em;
-    padding: 1em;
-    margin: 1em;
-    display: flex;
-    flex-direction: row;
-    overflow: hidden;
-    box-sizing: border-box;
-}
-
-.post-card:hover {
-    background-color: var(--alt-bg);
-    border: pink solid;
-}
-
-.post-img {
-    max-width: 25%;
-    object-fit: contain;
-    margin-bottom: 0.5em;
-}
-
-.post-text {
-    flex: 1;
-    min-height: 3em;
-    overflow: hidden;
-}
-
-.post-text-body {
-    display: -webkit-box;           /* Включаем flex-контейнер особого типа */
-    -webkit-line-clamp: 2;          /* Число строк, после которых ставим ... */
-    -webkit-box-orient: vertical;   /* Указываем вертикальную ориентацию */
-    overflow: hidden;               /* Скрываем всё, что не влезло */
-    text-overflow: ellipsis;        /* Добавляем само многоточие */
-
-    /* Дополнительно: убедитесь, что line-height настроен для красоты */
-    line-height: 1.5;
-    max-height: 3em;                /* Высота = line-height * количество строк */
-}
-
-.post-info {
-    display: flex;       /* Включаем Flexbox */
-    flex-direction: row;
-    gap: 1em
-}
-
-.post-info img {
-    width: 18px;
-    height: 18px;
-    margin: 1em -1em 1em 0;
-    filter: brightness(0) invert(1);
-}
-
-
-nav div:hover {
-    background-color: var(--bg-nav-hover);
-}
-.pixelated {
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
-    image-rendering: pixelated;
-}
-
-.container { padding: 40px; max-width: 800px; margin: 0 auto; }
-h1 { color: var(--textc); border-bottom: 2px solid var(--bgc); padding-bottom: 10px; }
-.menu { list-style: none; padding: 0; display: flex; gap: 20px; }
-.menu a { color: var(--textc); text-decoration: none; font-weight: bold; }
-.btn-back { margin-top: 20px; padding: 10px 20px; background: var(--bgc); color: var(--textc); border: none; cursor: pointer; border-radius: 5px; }
-li { margin: 10px 0; font-size: 1.1em; }
-
-
-/* ── Auth page ── */
+/* ----- auth page ----- */
 
 .auth-page {
     display: flex;
@@ -729,43 +616,172 @@ li { margin: 10px 0; font-size: 1.1em; }
     cursor: not-allowed;
 }
 
-/* ── Profile page ── */
+/* ----- profile page ----- */
 
-.profile-page { display: flex; justify-content: center; padding: 2em; min-height: 70vh; }
-.profile-loading { color: var(--ltextc); padding: 2em; }
+.profile-page {
+    display: flex;
+    justify-content: center;
+    padding: 2em;
+    min-height: 70vh;
+}
+
+.profile-loading {
+    color: var(--ltextc);
+    padding: 2em;
+}
+
 .profile-card {
-    background: var(--alt-bg); border: 2px solid var(--border); border-radius: 1em;
-    width: 100%; max-width: 520px; padding: 2em;
-    display: flex; flex-direction: column; gap: 1.5em; height: fit-content;
+    background: var(--alt-bg);
+    border: 2px solid var(--border);
+    border-radius: 1em;
+    width: 100%;
+    max-width: 520px;
+    padding: 2em;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5em;
+    height: fit-content;
 }
-.profile-header-section { display: flex; gap: 1.5em; align-items: center; }
-.profile-avatar-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.6em; flex-shrink: 0; }
-.profile-avatar { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); background: var(--bgc); }
+
+.profile-header-section {
+    display: flex;
+    gap: 1.5em;
+    align-items: center;
+}
+
+.profile-avatar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6em;
+    flex-shrink: 0;
+}
+
+.profile-avatar {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+    background: var(--bgc);
+}
+
 .profile-avatar-placeholder {
-    width: 90px; height: 90px; border-radius: 50%; border: 2px solid var(--border);
-    background: var(--bgc); display: flex; align-items: center; justify-content: center;
-    font-size: 2em; color: var(--ltextc);
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--bgc);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2em;
+    color: var(--ltextc);
 }
+
 .profile-avatar-btn {
-    font-size: 0.8em; padding: 0.3em 0.7em; border: 1px solid var(--border);
-    border-radius: 0.4em; cursor: pointer; color: var(--ltextc);
-    transition: color 0.2s, border-color 0.2s; background: transparent;
+    font-size: 0.8em;
+    padding: 0.3em 0.7em;
+    border: 1px solid var(--border);
+    border-radius: 0.4em;
+    cursor: pointer;
+    color: var(--ltextc);
+    transition: color 0.2s, border-color 0.2s;
+    background: transparent;
     white-space: nowrap;
 }
-.profile-avatar-btn:hover { color: var(--textc); border-color: var(--accentc); }
-.profile-meta { display: flex; flex-direction: column; gap: 0.4em; min-width: 0; }
-.profile-id { font-size: 0.8em; color: var(--ltextc); }
+
+.profile-avatar-btn:hover {
+    color: var(--textc);
+    border-color: var(--accentc);
+}
+
+.profile-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4em;
+    min-width: 0;
+}
+
+.profile-id   { font-size: 0.8em; color: var(--ltextc); }
 .profile-name { font-size: 1.4em; font-weight: bold; color: var(--textc); word-break: break-all; }
-.profile-roles { font-size: 0.8em; color: var(--accentc); background: rgba(0,123,255,0.12); padding: 0.2em 0.5em; border-radius: 0.3em; display: inline-block; }
-.profile-section { display: flex; flex-direction: column; gap: 0.8em; }
-.profile-section-title { font-size: 0.85em; font-weight: bold; color: var(--ltextc); margin: 0; text-transform: uppercase; letter-spacing: 0.06em; }
-.profile-tags-grid { display: flex; flex-wrap: wrap; gap: 0.6em; }
-.profile-tag-label { display: flex; align-items: center; gap: 0.4em; padding: 0.4em 0.85em; border: 1px solid var(--border); border-radius: 2em; cursor: pointer; font-size: 0.9em; color: var(--textc); transition: background 0.2s, border-color 0.2s; user-select: none; }
-.profile-tag-label:hover { background: var(--bg-nav-hover); border-color: var(--accentc); }
-.profile-tag-label input[type="checkbox"] { accent-color: var(--accentc); cursor: pointer; }
-.profile-actions { display: flex; align-items: center; gap: 1em; }
-.profile-save-btn { padding: 0.65em 1.5em; border: none; border-radius: 0.5em; background: var(--accentc); color: white; font-size: 1em; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+
+.profile-roles {
+    font-size: 0.8em;
+    color: var(--accentc);
+    background: rgba(0, 123, 255, 0.12);
+    padding: 0.2em 0.5em;
+    border-radius: 0.3em;
+    display: inline-block;
+}
+
+.profile-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8em;
+}
+
+.profile-section-title {
+    font-size: 0.85em;
+    font-weight: bold;
+    color: var(--ltextc);
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.profile-tags-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6em;
+}
+
+.profile-tag-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.4em 0.85em;
+    border: 1px solid var(--border);
+    border-radius: 2em;
+    cursor: pointer;
+    font-size: 0.9em;
+    color: var(--textc);
+    transition: background 0.2s, border-color 0.2s;
+    user-select: none;
+}
+
+.profile-tag-label:hover {
+    background: var(--bg-nav-hover);
+    border-color: var(--accentc);
+}
+
+.profile-tag-label input[type="checkbox"] {
+    accent-color: var(--accentc);
+    cursor: pointer;
+}
+
+.profile-actions {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+}
+
+.profile-save-btn {
+    padding: 0.65em 1.5em;
+    border: none;
+    border-radius: 0.5em;
+    background: var(--accentc);
+    color: white;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
 .profile-save-btn:hover:not(:disabled) { opacity: 0.85; }
 .profile-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.profile-status { font-size: 0.9em; color: var(--ltextc); }
 
+.profile-status {
+    font-size: 0.9em;
+    color: var(--ltextc);
+}
