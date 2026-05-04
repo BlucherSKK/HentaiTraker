@@ -13,6 +13,7 @@ import { SidebarNews } from './sidebar-news';
 import { SettingsPage, applySettings } from './settings';
 import { PostPage } from "./post-page";
 import { UserChip } from "./user-chip";
+import { setProfileCache } from "./store";
 
 declare global {
     interface Window {
@@ -60,6 +61,10 @@ customElements.define('app-settings',     SettingsPage);
 customElements.define('app-post-page', PostPage);
 customElements.define('user-chip', UserChip);
 // ----- App -----
+
+function inwindow(src: string): string {
+    return `<div class='window'> ${src} </div>`;
+}
 
 const App = {
     state: {
@@ -128,11 +133,33 @@ const App = {
         const ws = this.state.ws;
         if (!ws) return;
 
+        ws.on('profile_ok', (_ev: string, payload: Record<string, unknown>) => {
+            setProfileCache({
+                name:   payload.name   as string,
+                avatar: (payload.avatar ?? null) as string | null,
+                            score:  (payload.score  ?? 0)   as number,
+            });
+        });
+
+        ws.on('profile_updated', (_ev: string, payload: Record<string, unknown>) => {
+            setProfileCache({
+                name:   payload.name   as string,
+                avatar: (payload.avatar ?? null) as string | null,
+                            score:  (payload.score  ?? 0)   as number,
+            });
+        });
+
         bindPingIndicator(ws);
 
         const onAuthSuccess = (_ev: string, payload: Record<string, unknown>) => {
             const rawSettings = (payload.settings as string | null) ?? null;
             applySettings(rawSettings);
+
+            setProfileCache({
+                name:   payload.username as string,
+                avatar: (payload.avatar ?? null) as string | null,
+                            score:  (payload.score  ?? 0)   as number,
+            });
 
             this.state.user = {
                 name:     payload.username as string,
@@ -230,7 +257,7 @@ const App = {
             if (hero.querySelector(`[data-page="${page}"]`)) continue;
 
             const slot = document.createElement('div');
-            slot.className    = 'page-slot';
+            slot.className    = 'page-slot window';
             slot.dataset.page = page;
             slot.style.display = 'none';
             slot.innerHTML = this.getPageTemplate(page);

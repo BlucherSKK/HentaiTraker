@@ -328,6 +328,8 @@ pub fn ws(
                                                 "priv_at":     priv_at,
                                                 "user_id":     user.id,
                                                 "username":    user.name,
+                                                "avatar":      user.avatar,
+                                                "score":       user.score,
                                                 "roles":       role_names,
                                                 "permissions": permissions,
                                                 "settings":    settings,
@@ -386,6 +388,8 @@ pub fn ws(
                                                 "priv_at":     priv_at,
                                                 "user_id":     user.id,
                                                 "username":    user.name,
+                                                "avatar":      user.avatar,
+                                                "score":       user.score,
                                                 "roles":       role_names,
                                                 "permissions": permissions,
                                             }).to_string().as_bytes());

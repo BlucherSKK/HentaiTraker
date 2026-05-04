@@ -13,6 +13,9 @@
 
 @media (prefers-color-scheme: dark) {
     :root {
+        --f-bg: #242324;
+        --f-a-bg: #403f40;
+        --f-f-bg: #8e8e8e;
         --bgc: #111111;
         --textc: #eeeeee;
         --ltextc: #bfbfbf;
@@ -26,23 +29,138 @@
     }
 }
 
+body {
+    background-color: #222; /* Темный фон как на скриншоте */
+    font-family: sans-serif;
+}
 
+
+/* Главное окно (темная подложка) */
+.window {
+    background-color: #2b2b2b; /* Глубокий серый */
+    width: -moz-available;
+    padding: 15px;
+    border: 1px solid #1a1a1a;
+    display: inline-block;
+    min-width: 600px;
+}
+
+/* Контейнер для кнопок-вкладок */
+.f-tab {
+    display: flex;
+    gap: 3px;
+    border-bottom: 2px solid #1a1a1a;
+    padding-left: 5px;
+    background: linear-gradient(to bottom, #a0a0a0 0%, var(--f-a-bg) 3px);
+}
+
+/* Базовая кнопка (неактивная) */
+.f-btn {
+    padding: 6px 14px;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid #444;
+    border-bottom: none; /* Чтобы плавно переходило в линию */
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+
+    /* Градиент как на изображении.png (от светлого к темному) */
+    background: linear-gradient(to bottom, #a0a0a0 0%, #707070 100%);
+    color: #111;
+
+    /* Эффект объема: светлый блик сверху и мягкая тень */
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transition: filter 0.1s;
+}
+
+/* Активная/выбранная кнопка */
+.f-btn-selected {
+    padding: 6px 14px;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid #444;
+    border-bottom: none; /* Чтобы плавно переходило в линию */
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+
+    /* Градиент как на изображении.png (от светлого к темному) */
+    background: linear-gradient(to bottom, #a0a0a0 0%, var(--f-a-bg) 3px);
+    color: white;
+
+    /* Эффект объема: светлый блик сверху и мягкая тень */
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transition: filter 0.1s;
+    margin-bottom: -3px;
+}
+
+/* Внутренняя часть вкладки (панель под кнопками) */
+.f-tab-in {
+    background-color: var(--f-bg); /* Тот же цвет, что у активной кнопки */
+    border: 1px solid #1a1a1a;
+    border-top: none; /* Верхняя граница уже есть у .f-tab */
+    padding: 20px;
+    min-height: 200px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Эффект при наведении на неактивные кнопки */
+.f-btn:hover:not(.selected) {
+    filter: brightness(1.1);
+}
+.tabs-container {
+    display: flex;
+    gap: 4px;
+    background: #333; /* Цвет подложки */
+    padding: 10px 10px 0 10px;
+    border-bottom: 2px solid #1a1a1a;
+}
+
+.tab {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px 4px 0 0; /* Скругление только сверху */
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+
+    /* Основной градиент для неактивных кнопок */
+    background: linear-gradient(to bottom, #999 0%, #666 100%);
+    color: #000;
+
+    /* Эффект объема (внутренняя светлая линия сверху и тень снизу) */
+    box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.3);
+    border: 1px solid #444;
+}
+
+/* Стиль для активной вкладки */
+.tab.active {
+    background: #4a4238; /* Темно-коричневый оттенок */
+    color: #ffcc66;      /* Песочно-желтый текст */
+    border: 1px solid #5a5044;
+    border-bottom: 2px solid #4a4238; /* Перекрывает линию контейнера */
+    margin-bottom: -2px; /* Чтобы "приклеиться" к нижней рамке */
+
+    /* Убираем яркие блики для активной кнопки */
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* Эффект при наведении */
+.tab:hover:not(.active) {
+    background: linear-gradient(to bottom, #aaa 0%, #777 100%);
+}
 
 .user-container user-chip {
     cursor: pointer;
 }
 
 .user-container user-chip:hover {
-    border-color: var(--accentc);
-}
-
-.profile-btn, .profile-btn:active {
-   color: blue;
-   text-decoration: underline;
-}
-
-.profile-btn:hover {
-    color: cyan;
+    box-shadow: 0px 5px 5px 0px black;
 }
 
 .profile-posts-section {

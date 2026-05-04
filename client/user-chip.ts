@@ -14,9 +14,6 @@ const STYLES = `
     align-items: center;
     gap: 0.5em;
     padding: 0.25em 0.6em 0.25em 0.25em;
-    border-radius: 2em;
-    border: 1px solid var(--border);
-    background: var(--alt-bg);
     cursor: default;
     user-select: none;
     max-width: 220px;
@@ -25,7 +22,6 @@ const STYLES = `
 .user-chip__avatar {
     width: 1.8em;
     height: 1.8em;
-    border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
     background: var(--bgc);

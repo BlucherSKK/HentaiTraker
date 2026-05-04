@@ -27,7 +27,7 @@ export class AppNav extends HTMLElement {
         const page     = this.getAttribute('data-link') || 'feeds';
 
         const btn = (link: string, label: string) =>
-        `<button class="${page === link ? 'nav-btn-here' : 'nav-btn'}" data-link="${link}">${label}</button>`;
+        `<button class="${page === link ? 'f-btn-selected' : 'f-btn'}" data-link="${link}">${label}</button>`;
 
 
 

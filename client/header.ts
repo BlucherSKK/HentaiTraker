@@ -58,9 +58,9 @@ export function get_header(page: string, user?: User): string {
     injectHeaderStyles();
     return `
     <header class="header">
-    <div class="left-pane">
+    <div class="left-pane" style="display: ruby;">
         <img class="logo-img pixelated" src="${LOGO}" alt="Logo"/>
-        <div class="header-actions"></div>
+        <span style="font-size: 14px;"> alpha 0.0.1 </span>
     </div>
     <div class="right-pane">
         <span id="${PING_DOT_ID}" title="WebSocket"></span>
