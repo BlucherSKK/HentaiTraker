@@ -200,6 +200,12 @@ const App = {
             this.state.init = true;
         }
 
+        root.style = `
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        `;
+
         const hero = document.getElementById('apphero');
         if (!hero) return;
 
