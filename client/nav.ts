@@ -29,23 +29,17 @@ export class AppNav extends HTMLElement {
         const btn = (link: string, label: string) =>
         `<button class="${page === link ? 'f-btn-selected' : 'f-btn'}" data-link="${link}">${label}</button>`;
 
-
-
         this.innerHTML = `
-        <div class="nav-container">
-        <div class="nav-left">
+        <div class="f-tab-btns">
         ${btn('dm',    'личка')}
         ${btn('chats', 'чаты')}
         ${btn('feeds', 'лента')}
         ${canPost && page === 'feeds' ? btn('post-create', '+ пост') : ''}
-        ${page === 'feeds' ? `<button class="nav-btn nav-refresh-btn" id="nav-refresh-btn" title="Обновить ленту">↻</button>` : ''}
-        </div>
-        <div class="nav-right">
+        ${page === 'feeds' ? `<button class="f-btn nav-refresh-btn" id="nav-refresh-btn" title="Обновить ленту">↻</button>` : ''}
         ${isAuth ? btn('settings', 'настройки') : ''}
         ${isAdmin ? btn('terminal', 'терминал') : ''}
-        </div>
         </div>`;
 
         this._bindRefresh();
-    }
+     }
 }

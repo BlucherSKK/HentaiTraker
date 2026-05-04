@@ -33,82 +33,93 @@ body {
     background-color: #222; /* Темный фон как на скриншоте */
     font-family: sans-serif;
 }
+/* ----- tab buttons row ----- */
 
-
-/* Главное окно (темная подложка) */
-.window {
-    background-color: #2b2b2b; /* Глубокий серый */
-    width: -moz-available;
-    padding: 15px;
-    border: 1px solid #1a1a1a;
-    display: inline-block;
-    min-width: 600px;
-}
-
-/* Контейнер для кнопок-вкладок */
-.f-tab {
+.f-tab-btns {
     display: flex;
-    gap: 3px;
-    border-bottom: 2px solid #1a1a1a;
-    padding-left: 5px;
-    background: linear-gradient(to bottom, #a0a0a0 0%, var(--f-a-bg) 3px);
+    flex-direction: row;
+    gap: 2px;
+    align-items: flex-end;
+    padding: 4px 0 0 6px;
+    background: #1e1e1e;
 }
 
-/* Базовая кнопка (неактивная) */
 .f-btn {
-    padding: 6px 14px;
+    padding: 5px 16px;
     font-family: "Segoe UI", Tahoma, sans-serif;
     font-size: 13px;
-    font-weight: 700;
-    border: 1px solid #444;
-    border-bottom: none; /* Чтобы плавно переходило в линию */
+    font-weight: 600;
+    border: 1px solid #555;
+    border-bottom: none;
     border-radius: 4px 4px 0 0;
     cursor: pointer;
-
-    /* Градиент как на изображении.png (от светлого к темному) */
-    background: linear-gradient(to bottom, #a0a0a0 0%, #707070 100%);
-    color: #111;
-
-    /* Эффект объема: светлый блик сверху и мягкая тень */
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    background: linear-gradient(to bottom, #5a5a5a 0%, #3a3a3a 100%);
+    color: #ccc;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
     transition: filter 0.1s;
 }
 
-/* Активная/выбранная кнопка */
+.f-btn:hover {
+    filter: brightness(1.2);
+}
+
 .f-btn-selected {
-    padding: 6px 14px;
+    padding: 5px 16px;
     font-family: "Segoe UI", Tahoma, sans-serif;
     font-size: 13px;
-    font-weight: 700;
-    border: 1px solid #444;
-    border-bottom: none; /* Чтобы плавно переходило в линию */
+    font-weight: 600;
+    border: 1px solid #555;
+    border-bottom: none;
     border-radius: 4px 4px 0 0;
     cursor: pointer;
-
-    /* Градиент как на изображении.png (от светлого к темному) */
-    background: linear-gradient(to bottom, #a0a0a0 0%, var(--f-a-bg) 3px);
-    color: white;
-
-    /* Эффект объема: светлый блик сверху и мягкая тень */
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
-    transition: filter 0.1s;
-    margin-bottom: -3px;
+    background: var(--f-a-bg);
+    color: #e8c97a;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
 }
 
-/* Внутренняя часть вкладки (панель под кнопками) */
+.window {
+    background-color: #2b2b2b;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.f-tab {
+    background: #8e8e8e;
+    border: 2px solid #555;
+    border-top: none;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
 .f-tab-in {
-    background-color: var(--f-bg); /* Тот же цвет, что у активной кнопки */
+    background-color: var(--f-bg);
     border: 1px solid #1a1a1a;
-    border-top: none; /* Верхняя граница уже есть у .f-tab */
-    padding: 20px;
-    min-height: 200px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    padding: 16px;
+    box-sizing: border-box;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    flex: 1;
 }
 
-/* Эффект при наведении на неактивные кнопки */
-.f-btn:hover:not(.selected) {
-    filter: brightness(1.1);
+/* ----- f-tab nav groups ----- */
+.f-tab-left {
+    display: flex;
+    flex-direction: row;
+    gap: 3px;
 }
+
+.f-tab-right {
+    display: flex;
+    flex-direction: row;
+    gap: 3px;
+}
+
 .tabs-container {
     display: flex;
     gap: 4px;

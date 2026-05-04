@@ -195,7 +195,7 @@ const App = {
         if (!this.state.init) {
             root.innerHTML = `
             ${get_header("home", this.state.user)}
-            <hero id="apphero"></hero>
+            <div id="apphero"></div>
             `;
             this.state.init = true;
         }
@@ -257,31 +257,42 @@ const App = {
             if (hero.querySelector(`[data-page="${page}"]`)) continue;
 
             const slot = document.createElement('div');
-            slot.className    = 'page-slot window';
-            slot.dataset.page = page;
+            slot.className     = 'page-slot';
+            slot.dataset.page  = page;
             slot.style.display = 'none';
-            slot.innerHTML = this.getPageTemplate(page);
+            slot.innerHTML     = this.getPageTemplate(page);
             hero.appendChild(slot);
+            hero.querySelectorAll<HTMLElement>(':scope > .page-slot').forEach(el => {
+                el.style.display = el.dataset.page === this.state.page ? 'flex' : 'none';
+                el.style.flexDirection = 'column';
+            });
         }
+
     },
 
     getPageTemplate(page: PageType): string {
         const nav = `<app-nav data-link="${page}" data-user-roles="${this.state.user?.roles || ''}" data-user-id="${this.state.user?.id || ''}"></app-nav>`;
+
+        const wrap = (content: string) => `
+        ${nav}
+        <div class="f-tab">
+        <div class="f-tab-in">${content}</div>
+        </div>`;
+
         switch (page) {
-            case 'feeds': return `
-                ${nav}
+            case 'feeds': return wrap(`
                 <div class="feeds-layout">
                 <app-sidebar-news></app-sidebar-news>
                 <app-feed></app-feed>
-                </div>`;
-            case 'dm':          return `${nav}${this.state.user ? '' : get_nonlogin_dm_noty()}`;
-            case 'chats':       return `${nav}<app-chats></app-chats>`;
-            case 'login':       return `<app-auth></app-auth>`;
-            case 'profile':     return `${nav}<app-profile></app-profile>`;
-            case 'terminal':    return `${nav}<app-terminal></app-terminal>`;
-            case 'post-create': return `${nav}<app-post-create></app-post-create>`;
-            case 'settings': return `${nav}<app-settings></app-settings>`;
-            case 'post-page': return `${nav}<app-post-page></app-post-page>`;
+                </div>`);
+            case 'dm':          return wrap(this.state.user ? '' : get_nonlogin_dm_noty());
+            case 'chats':       return wrap(`<app-chats></app-chats>`);
+            case 'login':       return `<div class="f-tab"><div class="f-tab-in"><app-auth></app-auth></div></div>`;
+            case 'profile':     return wrap(`<app-profile></app-profile>`);
+            case 'terminal':    return wrap(`<app-terminal></app-terminal>`);
+            case 'post-create': return wrap(`<app-post-create></app-post-create>`);
+            case 'settings':    return wrap(`<app-settings></app-settings>`);
+            case 'post-page':   return wrap(`<app-post-page></app-post-page>`);
             default:            return nav;
         }
     },
