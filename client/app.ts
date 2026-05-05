@@ -56,7 +56,7 @@ customElements.define('app-auth',         AuthPage);
 customElements.define('app-profile',      ProfilePage);
 customElements.define('app-terminal',     TerminalPage);
 customElements.define('app-post-create',  PostCreatePage);
-customElements.define('app-sidebar-news', SidebarNews);
+customElements.define('app-sidebar', SidebarNews);
 customElements.define('app-settings',     SettingsPage);
 customElements.define('app-post-page', PostPage);
 customElements.define('user-chip', UserChip);
@@ -287,9 +287,12 @@ const App = {
 
         switch (page) {
             case 'feeds': return wrap(`
-                <div class="feeds-layout">
-                <app-sidebar-news></app-sidebar-news>
-                <app-feed></app-feed>
+                <div class="feed-layout">
+                    <div class="spacer"></div>
+                    <app-sidebar class='left'></app-sidebar>
+                    <app-feed></app-feed>
+                    <app-sidebar class='right'></app-sidebar>
+                    <div class="spacer"></div>
                 </div>`);
             case 'dm':          return wrap(this.state.user ? '' : get_nonlogin_dm_noty());
             case 'chats':       return wrap(`<app-chats></app-chats>`);

@@ -31,13 +31,17 @@ export class AppNav extends HTMLElement {
 
         this.innerHTML = `
         <div class="f-tab-btns">
-        ${btn('dm',    'личка')}
-        ${btn('chats', 'чаты')}
-        ${btn('feeds', 'лента')}
-        ${canPost && page === 'feeds' ? btn('post-create', '+ пост') : ''}
-        ${page === 'feeds' ? `<button class="f-btn nav-refresh-btn" id="nav-refresh-btn" title="Обновить ленту">↻</button>` : ''}
-        ${isAuth ? btn('settings', 'настройки') : ''}
-        ${isAdmin ? btn('terminal', 'терминал') : ''}
+            <div class='left-pane'>
+                ${btn('dm',    'личка')}
+                ${btn('chats', 'чаты')}
+                ${btn('feeds', 'лента')}
+                ${canPost && page === 'feeds' ? btn('post-create', '+ пост') : ''}
+                ${page === 'feeds' ? `<button class="f-btn nav-refresh-btn" id="nav-refresh-btn" title="Обновить ленту">↻</button>` : ''}
+            </div>
+            <div class="right-pane">
+                ${isAuth ? btn('settings', 'настройки') : ''}
+                ${isAdmin ? btn('terminal', 'терминал') : ''}
+            </div>
         </div>`;
 
         this._bindRefresh();

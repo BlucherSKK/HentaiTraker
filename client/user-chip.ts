@@ -72,8 +72,10 @@ function renderChipHtml(d: UserChipData): string {
 
     return `
     ${avatarHtml}
-    <span class="user-chip__name">${escHtml(d.name)}</span>
-    <span class="user-chip__score">⭐ ${d.score}</span>
+    <div style="display: grid;">
+        <span class="user-chip__name">${escHtml(d.name)}</span>
+        <span class="user-chip__score">⭐ ${d.score}</span>
+    </div>
     `;
 }
 

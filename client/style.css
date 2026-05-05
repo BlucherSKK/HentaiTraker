@@ -134,10 +134,26 @@ app-post-create, app-settings, app-post-page, app-auth {
 .f-tab-btns {
     display: flex;
     flex-direction: row;
+    justify-content: space-between;
     gap: 2px;
     align-items: flex-end;
     padding: 4px 0 0 6px;
     background: #1e1e1e;
+
+}
+
+.f-tab-btns .left-pane {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    margin-left: 1vw;
+}
+
+.f-tab-btns .right-pane {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    margin-right: 1vw;
 }
 
 .f-btn {
@@ -162,7 +178,7 @@ app-post-create, app-settings, app-post-page, app-auth {
 }
 
 .f-btn-selected {
-    padding: 5px 16px;
+    padding: 6px 16px;
     font-family: "Segoe UI", Tahoma, sans-serif;
     font-size: 13px;
     font-weight: 600;
@@ -172,7 +188,9 @@ app-post-create, app-settings, app-post-page, app-auth {
     cursor: pointer;
     background: var(--f-a-bg);
     color: #e8c97a;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    z-index: 1;
+    margin-bottom: -2px;
+    box-shadow: inset 0 1px 0 gray;
 }
 
 /* ----- nav refresh btn ----- */
@@ -197,6 +215,10 @@ app-post-create, app-settings, app-post-page, app-auth {
     display: flex;
     flex-direction: column;
     height: 87vh;
+    box-shadow:
+        inset 0px 1px 0 gray,
+        inset 0px 40px 30px -12px var(--f-a-bg),
+        inset 0 0 14px 0 black;
 }
 
 /* ----- f-tab-in (тело контента) ----- */
@@ -253,7 +275,7 @@ app-post-create, app-settings, app-post-page, app-auth {
 
 /* ----- feeds layout ----- */
 
-.feeds-layout {
+.feed-layout {
     display: flex;
     flex-direction: row;
     width: 100%;
@@ -262,11 +284,16 @@ app-post-create, app-settings, app-post-page, app-auth {
     overflow: hidden;
 }
 
-.feeds-layout app-feed {
-    flex: 0 0 40vw;
+.feed-layout .spacer {
+    flex-grow: 1;
+}
+
+.feed-layout app-feed {
+    flex-grow: 3;
     min-width: 0;
     overflow: hidden;
 }
+
 
 .feed {
     width: 100%;
@@ -658,6 +685,9 @@ app-post-create, app-settings, app-post-page, app-auth {
     display: flex;
     gap: 1.5em;
     align-items: center;
+    background: var(--f-bg);
+    padding: 1em;
+    box-shadow: -2px 2px 2px 1px gray, inset 0px 1px 3px 2px black;
 }
 
 .profile-avatar-wrap {

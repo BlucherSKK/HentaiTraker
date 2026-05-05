@@ -106,35 +106,35 @@ export class ProfilePage extends HTMLElement {
         const wrap = this.querySelector('.profile-page')!;
         wrap.innerHTML = `
         <div class="profile-card">
-        <div class="profile-header-section">
-        <div class="profile-avatar-wrap">
-        <img class="profile-avatar" src="${d.avatar ?? ''}" alt="avatar"
-        style="${d.avatar ? '' : 'display:none'}">
-        <div class="profile-avatar-placeholder"
-        style="${d.avatar ? 'display:none' : ''}">?</div>
-        <input type="file" id="avatar-file" accept="image/*" hidden>
-        <button type="button" class="profile-avatar-btn" id="avatar-btn">Сменить аватар</button>
-        </div>
-        <div class="profile-meta">
-        <div class="profile-id">ID: ${d.id}</div>
-        <div class="profile-name">${escHtml(d.name)}</div>
-        ${d.roles ? `<div class="profile-roles">${escHtml(d.roles)}</div>` : ''}
-        </div>
+            <div class="profile-header-section">
+                <div class="profile-avatar-wrap">
+                    <img class="profile-avatar" src="${d.avatar ?? ''}" alt="avatar"
+                    style="${d.avatar ? '' : 'display:none'}">
+                    <div class="profile-avatar-placeholder"
+                    style="${d.avatar ? 'display:none' : ''}">?</div>
+                    <input type="file" id="avatar-file" accept="image/*" hidden>
+                    <button type="button" class="profile-avatar-btn" id="avatar-btn">Сменить аватар</button>
+                </div>
+            <div class="profile-meta">
+                <div class="profile-id">ID: ${d.id}</div>
+                <div class="profile-name">${escHtml(d.name)}</div>
+                ${d.roles ? `<div class="profile-roles">${escHtml(d.roles)}</div>` : ''}
+            </div>
         </div>
         <div class="profile-section">
-        <h3 class="profile-section-title">Теги</h3>
-        <div class="profile-tags-grid">${tagsHtml}</div>
+            <h3 class="profile-section-title">Теги</h3>
+            <div class="profile-tags-grid">${tagsHtml}</div>
         </div>
         <div class="profile-actions">
-        <button class="profile-save-btn" id="save-btn">Сохранить</button>
-        <span class="profile-status" id="profile-status"></span>
+            <button class="profile-save-btn" id="save-btn">Сохранить</button>
+            <span class="profile-status" id="profile-status"></span>
         </div>
         </div>
         <div class="profile-posts-section" id="profile-posts-section">
-        <div class="profile-posts-header">Мои посты</div>
-        <div class="profile-posts-list" id="profile-posts-list">
-        <span class="profile-posts-loading">Загрузка постов...</span>
-        </div>
+            <div class="profile-posts-header">Мои посты</div>
+            <div class="profile-posts-list" id="profile-posts-list">
+                <span class="profile-posts-loading">Загрузка постов...</span>
+            </div>
         </div>`;
 
         this._bindProfileEvents();
