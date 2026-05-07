@@ -35,6 +35,7 @@ export class ProfilePage extends HTMLElement {
     private _data: ProfileData | null = null;
     private _pendingAvatarFile: File | null = null;
     private _pendingAvatarPreview: string | null = null;
+    private _isEditing = false;
 
     get ws(): HntWsConnection | undefined { return this._ws; }
     set ws(val: HntWsConnection | undefined) {
@@ -48,7 +49,7 @@ export class ProfilePage extends HTMLElement {
     }
 
     private render() {
-        this.innerHTML = `<div class="profile-page"><p class="profile-loading">Загрузка профиля...</p></div>`;
+        this.innerHTML = `<div id="profile-page" class="page filled profile"><p class="profile-loading">Загрузка профиля...</p></div>`;
     }
 
     private _loadProfile() {
@@ -66,9 +67,9 @@ export class ProfilePage extends HTMLElement {
                 id:     payload.id     as number,
                 name:   payload.name   as string,
                 avatar: (payload.avatar ?? null) as string | null,
-                tags:   (payload.tags   ?? null) as string | null,
-                roles:  rolesStr,
-                score:  (payload.score ?? 0) as number,
+                      tags:   (payload.tags   ?? null) as string | null,
+                      roles:  rolesStr,
+                      score:  (payload.score ?? 0) as number,
             };
             this._renderProfile();
             this._loadPosts();
@@ -89,13 +90,52 @@ export class ProfilePage extends HTMLElement {
         this._ws.send('user_posts', { limit: 50 }).catch(console.error);
     }
 
+    // ----- render -----
+
     private _renderProfile() {
         if (!this._data) return;
-        const d = this._data;
+        const wrap = this.querySelector('#profile-page')!;
 
-        const currentTags = d.tags
-        ? d.tags.split(',').map(t => t.trim()).filter(Boolean)
-        : [];
+        wrap.innerHTML = `
+        ${this._isEditing ? this._editHtml() : this._staticHtml()}
+        <div class="profile-posts-section" id="profile-posts-section">
+        <div class="profile-posts-header">Мои посты</div>
+        <div class="profile-posts-list" id="profile-posts-list">
+        <span class="profile-posts-loading">Загрузка постов...</span>
+        </div>
+        </div>`;
+
+        this._bindProfileEvents();
+    }
+
+    private _staticHtml(): string {
+        const d = this._data!;
+        const tags = d.tags ? d.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+        const tagsHtml = tags.map(tag =>
+        `<span class="profile-tag-badge">${TAG_LABELS[tag] ?? escHtml(tag)}</span>`
+        ).join('');
+
+        return `
+        <div class="profile-header-section">
+        <div class="profile-avatar-wrap">
+        <img class="profile-avatar" src="${d.avatar ?? ''}" alt="avatar"
+        style="${d.avatar ? '' : 'display:none'}">
+        <div class="profile-avatar-placeholder"
+        style="${d.avatar ? 'display:none' : ''}">?</div>
+        </div>
+        <div class="profile-meta">
+        <div class="profile-id">ID: ${d.id}</div>
+        <div class="profile-name">${escHtml(d.name)}</div>
+        ${d.roles ? `<div class="profile-roles">${escHtml(d.roles)}</div>` : ''}
+        </div>
+        <button class="profile-edit-btn" id="edit-btn" title="Редактировать">✏️</button>
+        </div>
+        ${tags.length ? `<div class="profile-tags-grid static">${tagsHtml}</div>` : ''}`;
+    }
+
+    private _editHtml(): string {
+        const d = this._data!;
+        const currentTags = d.tags ? d.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
 
         const tagsHtml = AVAILABLE_TAGS.map(tag => `
         <label class="profile-tag-label">
@@ -103,41 +143,29 @@ export class ProfilePage extends HTMLElement {
         <span>${TAG_LABELS[tag]}</span>
         </label>`).join('');
 
-        const wrap = this.querySelector('.profile-page')!;
-        wrap.innerHTML = `
-        <div class="profile-card">
-            <div class="profile-header-section">
-                <div class="profile-avatar-wrap">
-                    <img class="profile-avatar" src="${d.avatar ?? ''}" alt="avatar"
-                    style="${d.avatar ? '' : 'display:none'}">
-                    <div class="profile-avatar-placeholder"
-                    style="${d.avatar ? 'display:none' : ''}">?</div>
-                    <input type="file" id="avatar-file" accept="image/*" hidden>
-                    <button type="button" class="profile-avatar-btn" id="avatar-btn">Сменить аватар</button>
-                </div>
-            <div class="profile-meta">
-                <div class="profile-id">ID: ${d.id}</div>
-                <div class="profile-name">${escHtml(d.name)}</div>
-                ${d.roles ? `<div class="profile-roles">${escHtml(d.roles)}</div>` : ''}
-            </div>
+        return `
+        <div class="profile-header-section">
+        <img class="profile-avatar" src="${d.avatar ?? ''}" alt="avatar"
+        style="${d.avatar ? '' : 'display:none'}">
+        <div class="profile-avatar-placeholder"
+        style="${d.avatar ? 'display:none' : ''}">?</div>
+        <input type="file" id="avatar-file" accept="image/*" hidden>
+        <button type="button" class="profile-avatar-btn" id="avatar-btn">Сменить аватар</button>
+        <div class="profile-meta">
+        <div class="profile-id">ID: ${d.id}</div>
+        <div class="profile-name">${escHtml(d.name)}</div>
+        ${d.roles ? `<div class="profile-roles">${escHtml(d.roles)}</div>` : ''}
+        </div>
+        <button class="profile-edit-btn profile-edit-btn--cancel" id="edit-btn" title="Отмена">✕</button>
         </div>
         <div class="profile-section">
-            <h3 class="profile-section-title">Теги</h3>
-            <div class="profile-tags-grid">${tagsHtml}</div>
+        <h3 class="profile-section-title">Теги</h3>
+        <div class="profile-tags-grid">${tagsHtml}</div>
         </div>
         <div class="profile-actions">
-            <button class="profile-save-btn" id="save-btn">Сохранить</button>
-            <span class="profile-status" id="profile-status"></span>
-        </div>
-        </div>
-        <div class="profile-posts-section" id="profile-posts-section">
-            <div class="profile-posts-header">Мои посты</div>
-            <div class="profile-posts-list" id="profile-posts-list">
-                <span class="profile-posts-loading">Загрузка постов...</span>
-            </div>
+        <button class="profile-save-btn" id="save-btn">Сохранить</button>
+        <span class="profile-status" id="profile-status"></span>
         </div>`;
-
-        this._bindProfileEvents();
     }
 
     private _renderPosts(posts: PostItem[]) {
@@ -153,7 +181,21 @@ export class ProfilePage extends HTMLElement {
         bindPostCardClicks(list);
     }
 
+    // ----- events -----
+
     private _bindProfileEvents() {
+        this._bindCardEvents();
+    }
+
+
+    private _bindCardEvents() {
+        this.querySelector('#edit-btn')?.addEventListener('click', () => {
+            this._isEditing = !this._isEditing;
+            const card = this.querySelector('.profile-card')!;
+            card.innerHTML = this._isEditing ? this._editHtml() : this._staticHtml();
+            this._bindCardEvents();
+        });
+
         this.querySelector('#avatar-btn')?.addEventListener('click', () => {
             (this.querySelector('#avatar-file') as HTMLInputElement)?.click();
         });
@@ -175,7 +217,6 @@ export class ProfilePage extends HTMLElement {
 
         this.querySelector('#save-btn')?.addEventListener('click', () => this._save());
     }
-
     // ----- _save -----
 
     private async _save() {
@@ -216,8 +257,11 @@ export class ProfilePage extends HTMLElement {
                 this._pendingAvatarPreview = null;
             }
             this._pendingAvatarFile = null;
+            this._isEditing = false;
             status.textContent = 'Сохранено!';
-            setTimeout(() => { if (this.isConnected) status.textContent = ''; }, 2500);
+        setTimeout(() => {
+            if (this.isConnected) this._renderProfile();
+        }, 800);
         });
 
         const offErr = this._ws.once('error', (_ev, p) => {

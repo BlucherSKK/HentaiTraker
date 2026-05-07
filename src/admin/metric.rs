@@ -108,6 +108,10 @@ impl ServerState {
             uploads_total:      m.uploads_total,
         }
     }
+
+    pub async fn get_users_online(&self) -> u64 {
+        self.inner.read().await.users_online
+    }
 }
 
 pub struct StateSnapshot {

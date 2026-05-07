@@ -1,6 +1,7 @@
 use chrono::{NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use std::collections::HashSet;
 
 pub mod roles;
 pub use roles::{Permission, Role};
@@ -127,6 +128,13 @@ const COUNTER_TTL:     u64 = 3_600;
 
 
 impl Store {
+
+
+    // garbedge colector functions
+    pub async fn get_all_referenced_filenames(&self) -> Result<HashSet<String>, StoreError> {
+        Ok(self.db.get_all_referenced_filenames().await?)
+    }
+
     pub async fn init(db_url: &str, redis_url: &str) -> Result<Self, StoreError> {
         let db    = Database::init(db_url).await.map_err(StoreError::Db)?;
         let cache = RedisClient::init(redis_url).map_err(StoreError::Redis)?;

@@ -17,6 +17,8 @@ mod handle;
 mod hnts;
 mod secure;
 
+mod gc;
+
 mod admin;
 
 mod lfs;
@@ -156,6 +158,16 @@ async fn main() {
     );
 
 
+    let gc_threshold = std::env::var("GC_ONLINE_THRESHOLD")
+    .ok()
+    .and_then(|v| v.parse::<u64>().ok())
+    .unwrap_or(0);
+
+    let srv_state = admin::metric::ServerState::new();
+
+    gc::start(Arc::clone(&store), srv_state.clone(), gc_threshold);
+
+
     let hnts = HntsState::new();
     hnts.start_auto_refresh(Duration::from_secs(15 * 60));
 
@@ -164,7 +176,7 @@ async fn main() {
     .manage(hnts)
     .manage(SessionRegistry::new())
     .manage(UploadTokenStore::new())
-    .manage(admin::metric::ServerState::new())
+    .manage(srv_state)
     .mount("/",         routes![index, app_js, app_map, terminal_js])
     .mount("/api", routes![get_feed, lfs::upload, lfs::serve_file, lfs::delete_file, get_sidebar_news, get_post])
     .mount("/api/hnts", routes![hnts::get_token, handle::socket::ws])

@@ -1,6 +1,7 @@
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::Executor;
 use std::time::Duration;
+use std::collections::HashSet;
 
 use crate::db::roles::{Role, init_roles};
 use crate::db::{User, Post, Chat, Message};
@@ -21,6 +22,27 @@ impl Database {
         init_roles(&pool).await?;
         Ok(Self { pool })
     }
+
+
+    // garbdge collector functions
+
+    pub async fn get_all_referenced_filenames(&self) -> Result<HashSet<String>, sqlx::Error> {
+        let rows: Vec<(String,)> = sqlx::query_as(
+            "SELECT avatar FROM users WHERE avatar IS NOT NULL AND avatar != ''
+        UNION
+        SELECT unnest(string_to_array(files, ',')) FROM posts WHERE files IS NOT NULL AND files != ''
+        UNION
+        SELECT unnest(string_to_array(files, ',')) FROM msg   WHERE files IS NOT NULL AND files != ''
+        UNION
+        SELECT images FROM chats WHERE images IS NOT NULL AND images != ''"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(|(name,)| name).collect())
+    }
+
+
 
     // ----- users -----
 
