@@ -20,7 +20,7 @@ export class AuthPage extends HTMLElement {
 
     private render() {
         this.innerHTML = `
-        <div class="auth-page">
+        <div class="auth-page" id="${SNOW_ID}">
         <div class="auth-card">
         <div class="auth-tabs">
         <button class="auth-tab ${this._tab === 'login' ? 'auth-tab--active' : ''}" data-tab="login">Войти</button>

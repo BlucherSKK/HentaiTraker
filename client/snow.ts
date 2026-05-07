@@ -1,39 +1,53 @@
 // ----- config -----
 
-const GRID_W  = 240;
-const GRID_H  = 130;
-const COUNT   = 80;
+const GRID_W      = 500;
+const GRID_H      = 240;
+const COUNT       = 160;
+const FLAKE_SIZE  = 1;
+const ANGLE       = (5 * Math.PI) / 4;
+const DIR_X       = Math.cos(ANGLE);
+const DIR_Y       = -Math.sin(ANGLE);
 
 // ----- types -----
 
 interface Flake {
     x:       number;
     y:       number;
-    size:    1 | 2;
+    px:      number;
+    py:      number;
     speed:   number;
-    drift:   number;
     opacity: number;
 }
 
 // ----- factory -----
 
 function mkFlake(fromTop = false): Flake {
+    const x = Math.random() * (GRID_W + GRID_H);
+    const y = fromTop ? -2 : Math.random() * GRID_H;
     return {
-        x:       Math.random() * GRID_W,
-        y:       fromTop ? -2 : Math.random() * GRID_H,
-        size:    Math.random() < 0.3 ? 2 : 1,
-        speed:   0.15 + Math.random() * 0.45,
-        drift:   (Math.random() - 0.5) * 0.12,
-        opacity: 0.5 + Math.random() * 0.5,
+        x,
+        y,
+        px:      Math.floor(x),
+        py:      Math.floor(y),
+        speed:   0.5 + Math.random() * 0.6,
+        opacity: 0.45 + Math.random() * 0.55,
     };
+}
+
+// ----- draw plus -----
+
+function drawPlus(ctx: CanvasRenderingContext2D, x: number, y: number) {
+    const s = FLAKE_SIZE;
+    ctx.fillRect(x,         y - s,     s,     s * 3);
+    ctx.fillRect(x - s,     y,         s * 3, s);
 }
 
 // ----- core -----
 
 function runSnow(canvas: HTMLCanvasElement): () => void {
-    const ctx    = canvas.getContext('2d')!;
+    const ctx  = canvas.getContext('2d')!;
     let raf: number;
-    let alive    = true;
+    let alive  = true;
 
     canvas.width  = GRID_W;
     canvas.height = GRID_H;
@@ -46,18 +60,24 @@ function runSnow(canvas: HTMLCanvasElement): () => void {
         ctx.clearRect(0, 0, GRID_W, GRID_H);
 
         for (const f of flakes) {
-            f.y += f.speed;
-            f.x += f.drift;
+            f.x += DIR_X * f.speed;
+            f.y += DIR_Y * f.speed;
 
-            if (f.y > GRID_H + f.size) { Object.assign(f, mkFlake(true)); }
-            if (f.x >  GRID_W + f.size) { f.x = -f.size; }
-            if (f.x < -f.size)          { f.x =  GRID_W + f.size; }
+            const nx = Math.floor(f.x);
+            const ny = Math.floor(f.y);
 
-            const px = Math.round(f.x);
-            const py = Math.round(f.y);
+            if (nx !== f.px || ny !== f.py) {
+                f.px = nx;
+                f.py = ny;
+            }
+
+            if (f.py > GRID_H + 2 || f.px < -2) {
+                Object.assign(f, mkFlake(true));
+                continue;
+            }
 
             ctx.fillStyle = `rgba(255,255,255,${f.opacity.toFixed(2)})`;
-            ctx.fillRect(px, py, f.size, f.size);
+            drawPlus(ctx, f.px, f.py);
         }
 
         raf = requestAnimationFrame(tick);

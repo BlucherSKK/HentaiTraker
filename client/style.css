@@ -705,8 +705,10 @@ app-post-create, app-settings, app-post-page, app-auth {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 70vh;
     padding: 2em;
+    background: black;
+    box-shadow: inset 1em 44em 49em -45em yellow;
+    height: 100%;
 }
 
 .auth-card {
