@@ -133,9 +133,14 @@ export class HntWsConnection {
         this.ws.send(enc);
     }
 
-    async register(username: string, password: string): Promise<void> {
+    async register(username: string, password: string, inviteToken: string): Promise<void> {
         if (this.state.kind !== 'long_token') throw new Error('WS not in long_token state');
-        const enc = await encryptJson(this.state.priv_vtns, { event: 'register', username, password });
+        const enc = await encryptJson(this.state.priv_vtns, {
+            event:        'register',
+            username,
+            password,
+            invite_token: inviteToken,
+        });
         this.ws.send(enc);
     }
 

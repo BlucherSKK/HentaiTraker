@@ -43,9 +43,14 @@ export class AuthPage extends HTMLElement {
         `;
     }
 
+    // ----- renderRegister(): добавить поле инвайта первым -----
     private renderRegister(): string {
         return `
         <form class="auth-form" id="auth-form-register">
+        <div class="auth-field">
+        <label class="auth-label" for="reg-invite">Инвайт-токен</label>
+        <input class="auth-input" id="reg-invite" type="text" placeholder="Токен от администратора" required />
+        </div>
         <div class="auth-field">
         <label class="auth-label" for="reg-username">Имя пользователя</label>
         <input class="auth-input" id="reg-username" type="text" autocomplete="username" placeholder="От 3 до 32 символов" required minlength="3" maxlength="32" />
@@ -62,6 +67,44 @@ export class AuthPage extends HTMLElement {
         <button class="auth-submit" type="submit">Создать аккаунт</button>
         </form>
         `;
+    }
+
+    // ----- handleRegister(): читать инвайт и передавать -----
+    private async handleRegister() {
+        if (!this.ws) { this.showError('Нет соединения с сервером'); return; }
+
+        const inviteToken = this.querySelector<HTMLInputElement>('#reg-invite')?.value.trim() ?? '';
+        const username    = this.querySelector<HTMLInputElement>('#reg-username')?.value.trim() ?? '';
+        const password    = this.querySelector<HTMLInputElement>('#reg-password')?.value ?? '';
+        const password2   = this.querySelector<HTMLInputElement>('#reg-password2')?.value ?? '';
+
+        if (!inviteToken)               { this.showError('Введите инвайт-токен'); return; }
+        if (!username || !password || !password2) { this.showError('Заполните все поля'); return; }
+        if (password !== password2)     { this.showError('Пароли не совпадают'); return; }
+        if (password.length < 6)        { this.showError('Пароль должен быть минимум 6 символов'); return; }
+
+        this.setLoading(true);
+
+        const cleanup = this.ws.once('register_failed', (_ev, payload) => {
+            this.setLoading(false);
+            const code = payload.code as string;
+            const messages: Record<string, string> = {
+                invalid_invite_token: 'Неверный или уже использованный инвайт-токен',
+                username_taken:       'Это имя уже занято',
+                invalid_username:     'Имя должно быть от 3 до 32 символов',
+                password_too_short:   'Пароль слишком короткий',
+                db_error:             'Ошибка сервера, попробуйте позже',
+            };
+            this.showError(messages[code] ?? 'Ошибка регистрации');
+        });
+
+        try {
+            await this.ws.register(username, password, inviteToken);
+        } catch {
+            cleanup();
+            this.setLoading(false);
+            this.showError('Ошибка соединения');
+        }
     }
 
     private attachEvents() {
@@ -139,37 +182,4 @@ export class AuthPage extends HTMLElement {
         }
     }
 
-    private async handleRegister() {
-        if (!this.ws) { this.showError('Нет соединения с сервером'); return; }
-
-        const username  = this.querySelector<HTMLInputElement>('#reg-username')?.value.trim() ?? '';
-        const password  = this.querySelector<HTMLInputElement>('#reg-password')?.value ?? '';
-        const password2 = this.querySelector<HTMLInputElement>('#reg-password2')?.value ?? '';
-
-        if (!username || !password || !password2) { this.showError('Заполните все поля'); return; }
-        if (password !== password2) { this.showError('Пароли не совпадают'); return; }
-        if (password.length < 6)    { this.showError('Пароль должен быть минимум 6 символов'); return; }
-
-        this.setLoading(true);
-
-        const cleanup = this.ws.once('register_failed', (_ev, payload) => {
-            this.setLoading(false);
-            const code = payload.code as string;
-            const messages: Record<string, string> = {
-                username_taken:     'Это имя уже занято',
-                invalid_username:   'Имя должно быть от 3 до 32 символов',
-                password_too_short: 'Пароль слишком короткий',
-                db_error:           'Ошибка сервера, попробуйте позже',
-            };
-            this.showError(messages[code] ?? 'Ошибка регистрации');
-        });
-
-        try {
-            await this.ws.register(username, password);
-        } catch {
-            cleanup();
-            this.setLoading(false);
-            this.showError('Ошибка соединения');
-        }
-    }
 }

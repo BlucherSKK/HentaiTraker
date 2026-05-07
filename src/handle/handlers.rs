@@ -544,15 +544,18 @@ pub async fn get_upload_token(
 
 // ─── terminal_cmd ─────────────────────────────────────────────────────────────
 
-/// Payload: `{ input: string }`
-pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value, srv_state: metric::ServerState) {
+pub async fn terminal_cmd(
+    session:      Arc<Mutex<Session>>,
+    data:         Value,
+    srv_state:    metric::ServerState,
+    invite_store: Arc<crate::invite::InviteTokenStore>,
+) {
     let perm = {
         let s = session.lock().await;
         s.permissions.clone()
     };
-    let accept  = perm.contains(&(Permission::Terminal as i32));
 
-    if !accept {
+    if !perm.contains(&(Permission::Terminal as i32)) {
         let s = session.lock().await;
         s.send_encrypted(&json!({ "event": "error", "code": "forbidden" })).await;
         return;
@@ -563,18 +566,28 @@ pub async fn terminal_cmd(session: Arc<Mutex<Session>>, data: Value, srv_state: 
         _ => return,
     };
 
-    let output = admin::hnts_shell_exec(&input, srv_state.snapshot().await.format());
+    let raw_output = admin::hnts_shell_exec(&input, srv_state.snapshot().await.format());
 
-    let final_output = if let Some(id_str) = output.strip_prefix("news:set:") {
+    let final_output = if let Some(id_str) = raw_output.strip_prefix("news:set:") {
         match id_str.trim().parse::<i32>() {
             Ok(post_id) => {
                 srv_state.set_sidebar_post_id(post_id).await;
-                format!("sidebar привязана к посту #{}", post_id)
+                format!("sidebar привязана к посту #{post_id}")
             }
             Err(_) => "ошибка парсинга id".into(),
         }
+    } else if raw_output == "invite:gen" {
+        let token = invite_store.create_token().await;
+        format!("инвайт-токен создан:#NL##T#{token}")
+    } else if raw_output == "invite:list" {
+        let tokens = invite_store.list_tokens().await;
+        if tokens.is_empty() {
+            "нет активных инвайтов".into()
+        } else {
+            format!("активные инвайты (#NL# = новая строка):#NL#{}", tokens.join("#NL##T#"))
+        }
     } else {
-        output
+        raw_output
     };
 
     let s = session.lock().await;

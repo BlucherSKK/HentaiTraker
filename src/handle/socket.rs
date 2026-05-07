@@ -16,6 +16,7 @@ use crate::db::Store;
 use crate::secure;
 use crate::lfs::UploadTokenStore;
 use crate::admin::metric;
+use crate::invite::InviteTokenStore;
 
 // ----- constants -----
 
@@ -89,20 +90,24 @@ async fn handle_token_refresh(sess: &mut Session) {
 // ----- ws handler -----
 
 #[get("/ws/<pub_vtns>")]
-pub fn ws(
-    ws:           WebSocket,
-    pub_vtns:     String,
-    hnts:         &State<HntsState>,
-    store:        &State<Arc<Store>>,
-    registry:     &State<SessionRegistry>,
-    upload_store: &State<Arc<UploadTokenStore>>,
-    srv_state:    &State<metric::ServerState>,
+pub async fn ws(
+    pub_vtns:      String,
+    ws:            WebSocket,
+    store:         &State<Arc<Store>>,
+    hnts:          &State<HntsState>,
+    registry:      &State<SessionRegistry>,
+    upload_store:  &State<Arc<UploadTokenStore>>,
+    invite_store:  &State<Arc<InviteTokenStore>>,
+    srv_state:     &State<metric::ServerState>,
 ) -> Channel<'static> {
+
     let hnts         = hnts.inner().clone();
     let store        = Arc::clone(store.inner());
     let registry     = registry.inner().clone();
     let upload_store = Arc::clone(upload_store.inner());
     let srv_state    = srv_state.inner().clone();
+    let invite_store = Arc::clone(invite_store.inner());
+
 
     ws.channel(move |stream| Box::pin(async move {
         srv_state.on_connect().await;
@@ -192,11 +197,13 @@ pub fn ws(
                 async move { handlers::roles_update(sess, data, r).await }
             });
         }
-        {
+        {{
             let ss = srv_state.clone();
+            let is = Arc::clone(&invite_store);
             router.on("terminal_cmd", move |sess, data| {
                 let ss = ss.clone();
-                async move { handlers::terminal_cmd(sess, data, ss).await }
+                let is = Arc::clone(&is);
+                async move { handlers::terminal_cmd(sess, data, ss, is).await }
             });
         }
 
@@ -351,12 +358,16 @@ pub fn ws(
                                 }
 
                                 "register" => {
+                                    let invite_token = payload["invite_token"].as_str().unwrap_or("").to_string();
                                     let (username, password) = (
                                         payload["username"].as_str().unwrap_or("").to_string(),
                                                                 payload["password"].as_str().unwrap_or("").to_string(),
                                     );
 
                                     let register_result = async {
+                                        if !invite_store.consume_token(&invite_token).await {
+                                            return Err("invalid_invite_token");
+                                        }
                                         if username.len() < 3 || username.len() > 32 {
                                             return Err("invalid_username");
                                         }
@@ -368,7 +379,7 @@ pub fn ws(
                                             {
                                                 return Err("username_taken");
                                             }
-                                            let hash = secure::hash_password(&password).unwrap_or("".to_string());
+                                            let hash = secure::hash_password(&password).unwrap_or_default();
                                         store.insert_user(&username, &hash).await
                                         .map_err(|e| { error!("register insert_user: {e}"); "db_error" })
                                     }.await;
@@ -487,5 +498,5 @@ pub fn ws(
         if is_auth { srv_state.on_user_left().await; }
 
         Ok(())
-    }))
+    }}))
 }

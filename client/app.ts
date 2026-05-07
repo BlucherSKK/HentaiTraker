@@ -68,8 +68,8 @@ function inwindow(src: string): string {
 
 const App = {
     state: {
-        page:     'feeds',
-        lastpage: 'feeds',
+        page:     'login',
+        lastpage: 'login',
         items:    [],
         init:     false,
         db:       init_test_db(),
@@ -189,6 +189,9 @@ const App = {
     },
 
     render(): void {
+        if (!this.state.user && this.state.page !== 'login') {
+            this.state.page = 'login';
+        }
         const root = document.getElementById('app');
         if (!root) return;
 
@@ -312,6 +315,7 @@ const App = {
         window.addEventListener('app-navigate', (e: Event) => {
             const detail    = (e as CustomEvent).detail as { page: string; postId?: number };
             const targetPage = detail.page as PageType;
+            if (!this.state.user && targetPage !== 'login') return;
             if (targetPage === 'settings' && !this.state.user) return;
             if (targetPage) {
                 this.state.lastpage = this.state.page;
@@ -328,6 +332,7 @@ const App = {
             if (link) {
                 e.preventDefault();
                 const targetPage = link.getAttribute('data-link') as PageType;
+                if (!this.state.user && targetPage !== 'login') return;
                 if (targetPage && targetPage !== this.state.page) {
                     this.state.lastpage = this.state.page;
                     this.state.page     = targetPage;
@@ -338,7 +343,8 @@ const App = {
         });
 
         window.addEventListener('popstate', (e: PopStateEvent) => {
-            this.state.page   = e.state?.page   || 'feeds';
+            const page        = (e.state?.page || 'feeds') as PageType;
+            this.state.page   = (!this.state.user && page !== 'login') ? 'login' : page;
             this.state.postId = e.state?.postId ?? undefined;
             this.render();
         });

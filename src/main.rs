@@ -16,6 +16,7 @@ mod db;
 mod handle;
 mod hnts;
 mod secure;
+pub mod invite;
 
 mod gc;
 
@@ -176,6 +177,7 @@ async fn main() {
     .manage(hnts)
     .manage(SessionRegistry::new())
     .manage(UploadTokenStore::new())
+    .manage(invite::InviteTokenStore::new())
     .manage(srv_state)
     .mount("/",         routes![index, app_js, app_map, terminal_js])
     .mount("/api", routes![get_feed, lfs::upload, lfs::serve_file, lfs::delete_file, get_sidebar_news, get_post])
