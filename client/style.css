@@ -711,6 +711,8 @@ app-post-create, app-settings, app-post-page, app-auth {
 
 .auth-card {
     background: var(--alt-bg);
+    position: relative;
+    z-index: 1;
     border: 2px solid var(--border);
     border-radius: 1em;
     width: 100%;

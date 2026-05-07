@@ -1,6 +1,9 @@
+import { attachSnow, detachSnow } from './snow';
 import { HntWsConnection } from './ws';
 
 type AuthTab = 'login' | 'register';
+
+const SNOW_ID = 'snow-container';
 
 export class AuthPage extends HTMLElement {
     public ws: HntWsConnection | undefined;
@@ -9,6 +12,10 @@ export class AuthPage extends HTMLElement {
 
     connectedCallback() {
         this.render();
+    }
+
+    disconnectedCallback() {
+        detachSnow(SNOW_ID);
     }
 
     private render() {
@@ -23,6 +30,7 @@ export class AuthPage extends HTMLElement {
         </div>
         </div>
         `;
+        attachSnow(SNOW_ID);
         this.attachEvents();
     }
 
