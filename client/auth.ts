@@ -21,13 +21,9 @@ export class AuthPage extends HTMLElement {
     private render() {
         this.innerHTML = `
         <div class="auth-page" id="${SNOW_ID}">
-        <div class="auth-card">
-        <div class="auth-tabs">
-        <button class="auth-tab ${this._tab === 'login' ? 'auth-tab--active' : ''}" data-tab="login">Войти</button>
-        <button class="auth-tab ${this._tab === 'register' ? 'auth-tab--active' : ''}" data-tab="register">Зарегистрироваться</button>
-        </div>
-        ${this._tab === 'login' ? this.renderLogin() : this.renderRegister()}
-        </div>
+            <div class="auth-card card">
+            ${this._tab === 'login' ? this.renderLogin() : this.renderRegister()}
+            </div>
         </div>
         `;
         attachSnow(SNOW_ID);
@@ -39,14 +35,17 @@ export class AuthPage extends HTMLElement {
         <form class="auth-form" id="auth-form-login">
         <div class="auth-field">
         <label class="auth-label" for="login-username">Имя пользователя</label>
-        <input class="auth-input" id="login-username" type="text" autocomplete="username" placeholder="Введите логин" required />
+        <input class="input" id="login-username" type="text" autocomplete="username" placeholder="Введите логин" required />
         </div>
         <div class="auth-field">
         <label class="auth-label" for="login-password">Пароль</label>
-        <input class="auth-input" id="login-password" type="password" autocomplete="current-password" placeholder="Введите пароль" required />
+        <input class="input" id="login-password" type="password" autocomplete="current-password" placeholder="Введите пароль" required />
         </div>
         <div class="auth-error" id="auth-error" hidden></div>
-        <button class="auth-submit" type="submit">Войти</button>
+        <div style="display: flex;">
+            <button class="btn-1" type="submit">Войти</button>
+            <button class="btn-1" data-tab="register">Зарегестрироваться</button>
+        </div>
         </form>
         `;
     }

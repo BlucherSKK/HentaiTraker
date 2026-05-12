@@ -17,6 +17,7 @@ mod handle;
 mod hnts;
 mod secure;
 pub mod invite;
+mod email;
 
 mod gc;
 
