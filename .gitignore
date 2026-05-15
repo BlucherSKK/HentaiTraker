@@ -4,3 +4,4 @@
 *.js.map
 *.kate-swp
 /src/uploads
+/captcha_images
