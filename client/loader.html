@@ -39,7 +39,6 @@
             transition: width 0.25s ease;
         }
 
-        /* Лог шагов */
         #step-log {
             width: 300px;
             margin: 4px 0 0;
@@ -62,6 +61,63 @@
             margin-top: 10px;
             line-height: 1.5;
         }
+
+        /* ----- captcha gate ----- */
+
+        #captcha-gate {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-top: 14px;
+            width: 300px;
+        }
+        #cg-prompt {
+            margin: 0;
+            font-size: 0.95em;
+            color: var(--textc);
+            text-align: center;
+        }
+        #cg-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            width: 300px;
+        }
+        #cg-grid button {
+            aspect-ratio: 1;
+            padding: 0;
+            border: 3px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            overflow: hidden;
+            background: #333;
+        }
+        #cg-grid button img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        #cg-grid button.cg-selected { border-color: var(--accentc); }
+        #cg-error {
+            margin: 0;
+            font-size: 0.82em;
+            color: #e53935;
+            display: none;
+        }
+        #cg-actions { display: flex; gap: 8px; }
+        #cg-refresh {
+            padding: 6px 14px; cursor: pointer;
+            background: none; border: 1px solid var(--border);
+            color: var(--textc); border-radius: 4px;
+        }
+        #cg-submit {
+            padding: 6px 18px; cursor: pointer;
+            background: var(--accentc); color: #fff;
+            border: none; border-radius: 4px;
+        }
+        #cg-submit:disabled { opacity: 0.6; cursor: default; }
     </style>
 </head>
 <body>
@@ -71,11 +127,21 @@
 
     <h2 id="status">Кто это у нас тут?</h2>
 
-    <div id="progress-container">
+    <div id="progress-container" style="display:none;">
         <div id="progress-bar"></div>
     </div>
 
     <ul id="step-log"></ul>
+
+    <div id="captcha-gate">
+        <p id="cg-prompt">Загрузка капчи…</p>
+        <div id="cg-grid"></div>
+        <p id="cg-error"></p>
+        <div id="cg-actions">
+            <button id="cg-refresh" type="button">🔄 Другая</button>
+            <button id="cg-submit"  type="button" disabled>Подтвердить</button>
+        </div>
+    </div>
 
     <p id="slop">
         HentaiTraker основан на технологии SPA<br>
@@ -89,21 +155,20 @@
 
 <script>
 (async function startLoading() {
-    const statusEl    = document.getElementById('status');
-    const progressBar = document.getElementById('progress-bar');
+    const statusEl     = document.getElementById('status');
+    const progressBar  = document.getElementById('progress-bar');
     const appContainer = document.getElementById('app');
-    const checkerUI   = document.getElementById('checker-ui');
-    const stepLog     = document.getElementById('step-log');
+    const checkerUI    = document.getElementById('checker-ui');
+    const stepLog      = document.getElementById('step-log');
 
-    // ── UI-хелперы ────────────────────────────────────────────────────────
+    // ----- UI-хелперы -----
 
     function setStatus(text) { statusEl.textContent = text; }
-
     function setProgress(pct) { progressBar.style.width = Math.min(pct, 100) + '%'; }
 
     function addStep(text, cls) {
         const li = document.createElement('li');
-        li.className  = cls || 'pending';
+        li.className   = cls || 'pending';
         li.textContent = text;
         stepLog.appendChild(li);
         return li;
@@ -118,8 +183,7 @@
         statusEl.style.color = '#e53935';
     }
 
-    // ── Крипто-примитивы (совместимы с src/secure.rs) ────────────────────
-    //
+    // ----- крипто-примитивы (совместимы с src/secure.rs) -----
     //   key  = SHA-256(keyMaterial)
     //   wire = nonce(12 байт) || ciphertext+tag
 
@@ -146,16 +210,133 @@
         return out;
     }
 
+    // ----- captcha gate -----
+
+    async function captchaGate() {
+        const gateEl  = document.getElementById('captcha-gate');
+        const grid    = document.getElementById('cg-grid');
+        const prompt  = document.getElementById('cg-prompt');
+        const errEl   = document.getElementById('cg-error');
+        const submit  = document.getElementById('cg-submit');
+        const refresh = document.getElementById('cg-refresh');
+
+        let challengeId = '';
+        let selected    = new Set();
+        let busy        = false;
+
+        function showErr(msg) { errEl.textContent = msg; errEl.style.display = 'block'; }
+        function clearErr()   { errEl.style.display = 'none'; }
+
+        async function loadChallenge() {
+            grid.innerHTML     = '';
+            selected           = new Set();
+            submit.disabled    = true;
+            submit.textContent = 'Подтвердить';
+            busy               = false;
+            clearErr();
+            prompt.textContent = 'Загрузка…';
+
+            try {
+                const res  = await fetch('/api/captcha/challenge');
+                const data = await res.json();
+                if (!res.ok || data.error) { showErr('Не удалось загрузить капчу'); return; }
+
+                challengeId        = data.challenge_id;
+                prompt.textContent = `${data.target}`;
+                submit.disabled    = false;
+
+                data.images.forEach((url, idx) => {
+                    const btn     = document.createElement('button');
+                    btn.type      = 'button';
+                    const img     = document.createElement('img');
+                    img.src       = url;
+                    img.alt       = '';
+                    img.draggable = false;
+                    btn.appendChild(img);
+                    btn.addEventListener('click', () => {
+                        if (selected.has(idx)) {
+                            selected.delete(idx);
+                            btn.classList.remove('cg-selected');
+                        } else {
+                            selected.add(idx);
+                            btn.classList.add('cg-selected');
+                        }
+                    });
+                    grid.appendChild(btn);
+                });
+            } catch {
+                showErr('Ошибка сети');
+            }
+        }
+
+        return new Promise((resolve) => {
+            refresh.addEventListener('click', loadChallenge);
+
+            submit.addEventListener('click', async () => {
+                if (busy) return;
+                if (selected.size === 0) { showErr('Выберите хотя бы одно изображение'); return; }
+
+                busy               = true;
+                submit.disabled    = true;
+                submit.textContent = 'Проверка…';
+                clearErr();
+
+                try {
+                    const res  = await fetch('/api/captcha/gate', {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body:    JSON.stringify({
+                            challenge_id: challengeId,
+                            selected:     [...selected],
+                        }),
+                    });
+                    const data = await res.json();
+
+                    if (res.ok && data.ok) {
+                        gateEl.style.display = 'none';
+                        resolve();
+                    } else {
+                        showErr('Неверный ответ, попробуйте ещё раз');
+                        await loadChallenge();
+                    }
+                } catch {
+                    showErr('Ошибка сети');
+                    busy               = false;
+                    submit.disabled    = false;
+                    submit.textContent = 'Подтвердить';
+                }
+            });
+
+            gateEl.style.display = 'flex';
+            loadChallenge();
+        });
+    }
+
+    // ----- gate check (до шага 1) -----
+
+    try {
+        const res  = await fetch('/api/captcha/gate');
+        const data = await res.json().catch(() => ({ passed: true }));
+        if (!data.passed) {
+            setStatus('Подтвердите, что вы не робот');
+            await captchaGate();
+        }
+    } catch { /* при ошибке гейта — пропускаем */ }
+
+
+    document.getElementById('progress-container').style.display = 'block';
+
     // ─────────────────────────────────────────────────────────────────────
     // Шаг 1 — Генерация ВТНС токенов
     // ─────────────────────────────────────────────────────────────────────
+
     setStatus('Инициализация...');
     setProgress(5);
     const s1 = addStep('Генерация ВТНС токенов...');
     await new Promise(r => setTimeout(r, 120));
 
-    const pub_vtns  = generateToken(16);   // 16 байт → публичный (в URL)
-    const priv_vtns = generateToken(32);   // 32 байта → приватный (ключ шифрования)
+    const pub_vtns  = generateToken(16);
+    const priv_vtns = generateToken(32);
 
     doneStep(s1, 'ВТНС токены сгенерированы');
     setProgress(15);
@@ -163,6 +344,7 @@
     // ─────────────────────────────────────────────────────────────────────
     // Шаг 2 — Получение серверного ХНТС токена
     // ─────────────────────────────────────────────────────────────────────
+
     setStatus('Получение серверного токена...');
     const s2 = addStep('Запрос ХНТС токена у сервера...');
 
@@ -183,6 +365,7 @@
     // ─────────────────────────────────────────────────────────────────────
     // Шаг 3 — Открытие WebSocket
     // ─────────────────────────────────────────────────────────────────────
+
     setStatus('Подключение WebSocket...');
     const s3 = addStep('Установка соединения...');
 
@@ -192,7 +375,7 @@
     let ws;
     try {
         ws = await new Promise((resolve, reject) => {
-            const sock = new WebSocket(wsUrl);
+            const sock  = new WebSocket(wsUrl);
             sock.binaryType = 'arraybuffer';
             const timer = setTimeout(() => reject(new Error('Таймаут подключения')), 6000);
             sock.onopen  = () => { clearTimeout(timer); resolve(sock); };
@@ -208,6 +391,7 @@
     // ─────────────────────────────────────────────────────────────────────
     // Шаг 4 — ВТНС рукопожатие (Entrypoint → LongToken)
     // ─────────────────────────────────────────────────────────────────────
+
     setStatus('ВТНС аутентификация...');
     const s4 = addStep('Отправка ВТНС запроса...');
 
@@ -229,6 +413,7 @@
     // ─────────────────────────────────────────────────────────────────────
     // Шаг 5 — Ожидание auth_ok
     // ─────────────────────────────────────────────────────────────────────
+
     const s5 = addStep('Ожидание подтверждения сервера...');
 
     try {
@@ -268,12 +453,12 @@
         return;
     }
 
-    // Передаём WebSocket + токены в приложение
     window.__VTNS__ = { pub_vtns, priv_vtns, ws };
 
     // ─────────────────────────────────────────────────────────────────────
     // Шаг 6 — Загрузка JS-модуля приложения
     // ─────────────────────────────────────────────────────────────────────
+
     setStatus('Загрузка приложения...');
     const s6 = addStep('Загрузка основного модуля...');
 
@@ -307,7 +492,7 @@
         script.src     = scriptUrl;
         script.onload  = () => {
             setProgress(100);
-            checkerUI.style.display = 'none';
+            checkerUI.style.display    = 'none';
             appContainer.style.display = 'block';
         };
         script.onerror = () => {
@@ -319,7 +504,7 @@
     } catch (err) {
         fatal(s6, 'Ошибка: ' + err.message, 'Не удалось загрузить приложение');
     }
+
 })();
 </script>
 </body>
-</html>

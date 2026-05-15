@@ -130,6 +130,14 @@ const COUNTER_TTL:     u64 = 3_600;
 impl Store {
 
 
+    pub async fn captcha_gate_check(&self, key: &str) -> bool {
+        self.cache.get(key).await.is_some()
+    }
+
+    pub async fn captcha_gate_set(&self, key: &str, ttl: u64) {
+        self.cache.set_ex(key, "1", ttl).await;
+    }
+
     // garbedge colector functions
     pub async fn get_all_referenced_filenames(&self) -> Result<HashSet<String>, StoreError> {
         Ok(self.db.get_all_referenced_filenames().await?)

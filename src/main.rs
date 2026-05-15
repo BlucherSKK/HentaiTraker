@@ -19,6 +19,8 @@ mod secure;
 pub mod invite;
 mod email;
 
+pub mod captcha;
+
 mod gc;
 
 mod admin;
@@ -108,6 +110,8 @@ async fn get_feed(store: &State<Arc<Store>>) -> RawJson<String> {
 }
 use admin::metric;
 
+use crate::captcha::CaptchaStore;
+
 // ----- posts -----
 
 #[get("/post/<id>")]
@@ -173,6 +177,8 @@ async fn main() {
     let hnts = HntsState::new();
     hnts.start_auto_refresh(Duration::from_secs(15 * 60));
 
+    let captcha_store = CaptchaStore::load().await;
+
     rocket::build()
     .manage(Arc::clone(&store))
     .manage(hnts)
@@ -180,8 +186,16 @@ async fn main() {
     .manage(UploadTokenStore::new())
     .manage(invite::InviteTokenStore::new())
     .manage(srv_state)
+    .manage(captcha_store)
     .mount("/",         routes![index, app_js, app_map, terminal_js])
     .mount("/api", routes![get_feed, lfs::upload, lfs::serve_file, lfs::delete_file, get_sidebar_news, get_post])
+    .mount("/api/captcha", routes![
+        captcha::challenge,
+        captcha::verify,
+        captcha::image,
+        captcha::gate_check,
+        captcha::gate_verify,
+    ])
     .mount("/api/hnts", routes![hnts::get_token, handle::socket::ws])
     .launch()
     .await

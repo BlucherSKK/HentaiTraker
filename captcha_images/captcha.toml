@@ -1,0 +1,7 @@
+["Выберите кошек"]
+folder  = "xaz"
+correct = [0, 1]
+
+["Найдите автомобили"]
+folder  = "cats"
+correct = [1, 4]
