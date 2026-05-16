@@ -133,7 +133,7 @@
 
     <ul id="step-log"></ul>
 
-    <div id="captcha-gate">
+    <div id="captcha-gate" style="display: none;">
         <p id="cg-prompt">Загрузка капчи…</p>
         <div id="cg-grid"></div>
         <p id="cg-error"></p>
@@ -313,6 +313,8 @@
     }
 
     // ----- gate check (до шага 1) -----
+    document.getElementById('captcha-gate').style.display = 'block';
+
 
     try {
         const res  = await fetch('/api/captcha/gate');
@@ -324,6 +326,8 @@
     } catch { /* при ошибке гейта — пропускаем */ }
 
 
+
+    document.getElementById('captcha-gate').style.display = 'none';
     document.getElementById('progress-container').style.display = 'block';
 
     // ─────────────────────────────────────────────────────────────────────

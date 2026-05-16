@@ -22,8 +22,8 @@ use crate::secure;
 
 // ----- constants -----
 
-const CAPTCHA_DIR:        &str = "/home/blucher/development/HentaiTraker/captcha_images";
-const CONFIG_PATH:        &str = "/home/blucher/development/HentaiTraker/captcha_images/captcha.toml";
+const CAPTCHA_DIR:        &str = "/home/blucher/development/HentaiTraker/captch_images";
+const CONFIG_PATH:        &str = "/home/blucher/development/HentaiTraker/captch_images/captcha.toml";
 const CHALLENGE_TTL_SECS: u64  = 300;
 const TOKEN_TTL_SECS:     u64  = 120;
 const GATE_TTL_SECS:      u64  = 3600;
@@ -125,7 +125,7 @@ impl CaptchaStore {
         if self.entries.is_empty() { return None; }
 
         // ----- выбор задания (rng дропается до await) -----
-        let (prompt, mut slots) = {
+        let (prompt, slots) = {
             let mut rng   = rand::rng();
             let entry     = self.entries.choose(&mut rng)?;
             let prompt    = entry.prompt.clone();
@@ -164,12 +164,19 @@ impl CaptchaStore {
 
     pub async fn verify(&self, challenge_id: &str, selected: &[usize]) -> bool {
         let mut map = self.challenges.write().await;
-        let ch      = match map.remove(challenge_id) {
+
+        let ch = match map.remove(challenge_id) {
             Some(c) => c,
-            None    => return false,
+            None    => {
+                warn!("captcha::verify — challenge не найден: id='{}'", challenge_id);
+                return false;
+            }
         };
 
-        if ch.issued_at.elapsed().as_secs() >= CHALLENGE_TTL_SECS { return false; }
+        if ch.issued_at.elapsed().as_secs() >= CHALLENGE_TTL_SECS {
+            warn!("captcha::verify — challenge истёк: elapsed={}s", ch.issued_at.elapsed().as_secs());
+            return false;
+        }
 
         let mut correct: Vec<usize> = ch.slots.iter().enumerate()
         .filter(|(_, s)| s.is_target)
@@ -180,7 +187,12 @@ impl CaptchaStore {
         let mut given = selected.to_vec();
         given.sort_unstable();
 
-        given == correct
+        if given != correct {
+            warn!("captcha::verify — неверный ответ: given={:?} correct={:?}", given, correct);
+            return false;
+        }
+
+        true
     }
 
     pub async fn verify_and_token(&self, challenge_id: &str, selected: &[usize]) -> Option<String> {
