@@ -72,11 +72,10 @@ export function renderPostCard(post: PostCardData, mode: PostCardMode): string {
         statsHtml = `<div class="pc-card-stats"><span style="color:var(--ltextc);font-size:0.8em">0 💬 &nbsp; 0 ❤️</span></div>`;
     }
 
-    const clickable = mode !== 'preview' && post.id != null;
 
     return `
-    <div class="pc-card post-card${clickable ? ' pc-card-clickable' : ''}"
-    ${clickable ? `data-post-id="${post.id}" ` : ''}>
+    <div class="post-card c-foreign c-foreign-act c-foreign-hov"
+    data-post-id=${post.id}/>
     ${imageHtml}
     <div class="pc-card-body">
     <div class="pc-card-header">

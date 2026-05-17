@@ -32,7 +32,9 @@ interface Store {
     profileCache: ProfileCache | null;
 }
 
-let _store: Store = { settings: { ...DEFAULTS }, lang: 'en', profileCache: null };
+let _store: Store = { settings: { ...DEFAULTS },
+lang: navigator.language.split('-')[0] == 'ru' ? 'ru' : 'en',
+profileCache: null };
 
 export function getSettings(): UserSettings {
     return _store.settings;

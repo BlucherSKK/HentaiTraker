@@ -21,7 +21,7 @@ export class AuthPage extends HTMLElement {
     private render() {
         this.innerHTML = `
         <div class="auth-page" id="${SNOW_ID}">
-            <div class="auth-card card">
+            <div class="auth-card card c-foreign">
             ${this._tab === 'login' ? this.renderLogin() : this.renderRegister()}
             </div>
         </div>

@@ -11,7 +11,9 @@ const Slovar: Record<string, string[]> = {
     'toast-sound-info': ['Info notify sound', 'Звук информационного уведомления'],
     'toast-sound-succes': ['Succes notify sound', 'Звук уведомления успеха'],
     'toast-sound-warn': ['Warning sound', 'Звук предупреждения'],
-    'toast-sound-error': ['Error sound', 'Звук ошибки']
+    'toast-sound-error': ['Error sound', 'Звук ошибки'],
+
+    'btn-profile': ["profile", "профиль"],
 
 }
 

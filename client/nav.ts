@@ -1,3 +1,5 @@
+import { rep } from "./languge";
+
 export class AppNav extends HTMLElement {
 
     static get observedAttributes() {
@@ -39,6 +41,7 @@ export class AppNav extends HTMLElement {
                 ${page === 'feeds' ? `<button class="f-btn nav-refresh-btn" id="nav-refresh-btn" title="Обновить ленту">↻</button>` : ''}
             </div>
             <div class="right-pane">
+                ${isAuth && page == "profile" ? btn('profile', rep("btn-profile")) : ''}
                 ${isAuth ? btn('settings', 'настройки') : ''}
                 ${isAdmin ? btn('terminal', 'терминал') : ''}
             </div>

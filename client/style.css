@@ -168,8 +168,20 @@ app-post-create, app-settings, app-post-page, app-auth {
 }
 
 .b1:hover {
+    color: #000;
+    text-decoration: none;
+    outline: 0;
     box-shadow:
-        inset 0 0 2px 0 gold;
+    inset 8px 0px 4px -8px #000,
+    inset -8px 0px 4px -8px #000,
+    inset 0px 9px 2px -8px #fff,
+    inset 0px 8px 4px -8px #000,
+    inset 0px -8px 4px -8px #000,
+    inset 0px -9px 2px -8px #432400,
+    0px 0px 4px 0px #000,
+    inset 0px 0px 4px 2px #f9b44b;
+    background-color: #e39827;
+    filter: drop-shadow(0 0 2px #f9b44b);
 }
 
 .f-btn {
@@ -315,8 +327,6 @@ app-post-create, app-settings, app-post-page, app-auth {
 
 .post-card,
 .post-card:active {
-    border: var(--border) solid;
-    border-radius: 2em;
     padding: 1em;
     margin: 1em;
     display: flex;
@@ -325,10 +335,6 @@ app-post-create, app-settings, app-post-page, app-auth {
     box-sizing: border-box;
 }
 
-.post-card:hover {
-    background-color: var(--alt-bg);
-    border: pink solid;
-}
 
 .post-img {
     max-width: 25%;
@@ -783,7 +789,7 @@ app-post-create, app-settings, app-post-page, app-auth {
     height: 100%;
 }
 
-.card {
+.c-insert {
     box-shadow:
     inset 8px 0px 4px -8px #000,
     inset -8px 0px 4px -8px #000,
@@ -792,8 +798,47 @@ app-post-create, app-settings, app-post-page, app-auth {
     inset 0px -9px 2px -8px #000,0px 0px 4px 0px #000;
 }
 
+.c-foreign {
+    box-shadow:
+    inset 8px 0px 4px -8px #000,
+    inset -8px 0px 4px -8px #000,
+    inset 0px 8px 8px -10px lightgray,
+    inset 0px 10px 2px -8px gray,
+    inset 0px -9px 2px -8px #000,0px 0px 4px 0px #000;
+    background-color: var(--bg-average);
+}
+
+.c-foreign-hov:hover, .c-foreign-hov:focus {
+    box-shadow:
+    inset 8px 0px 4px -8px #000,
+    inset -8px 0px 4px -8px #000,
+    inset 0px 8px 8px -10px gold,
+    inset 0px 10px 2px -8px gray,
+    inset 0px -9px 2px -8px #000,0px 0px 4px 0px #000;
+}
+
+.c-foreign-act:active {
+    position: relative;
+    padding-top: 12px;
+    padding-bottom: 8px;
+    vertical-align: -2px;
+    box-shadow:
+    inset 0px 10px 2px -8px #000,
+    inset 0px 9px 2px -8px #000,
+    inset 8px 0px 4px -8px #563a10,
+    inset 8px 0px 4px -8px #563a10,
+    inset -8px 0px 4px -8px #563a10,
+    inset -8px 0px 4px -8px #563a10,
+    inset 0px 9px 2px -8px #563a10,
+    inset 0px -9px 2px -8px #563a10,
+    inset 0px -8.5px 0px -8px #563a10,
+    0px 0px 4px 0px #000;
+    background-color: #f1be64;
+    filter: none;
+    outline: 0;
+}
+
 .auth-card {
-    background: var(--bg-average);
     position: relative;
     z-index: 1;
     overflow: hidden;

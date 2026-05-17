@@ -22,8 +22,8 @@ use crate::secure;
 
 // ----- constants -----
 
-const CAPTCHA_DIR:        &str = "/home/blucher/development/HentaiTraker/captch_images";
-const CONFIG_PATH:        &str = "/home/blucher/development/HentaiTraker/captch_images/captcha.toml";
+const CAPTCHA_DIR:        &str = "/home/blucher/development/HentaiTraker/captcha_images";
+const CONFIG_PATH:        &str = "/home/blucher/development/HentaiTraker/captcha_images/captcha.toml";
 const CHALLENGE_TTL_SECS: u64  = 300;
 const TOKEN_TTL_SECS:     u64  = 120;
 const GATE_TTL_SECS:      u64  = 3600;
