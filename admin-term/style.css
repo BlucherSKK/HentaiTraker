@@ -2,14 +2,25 @@
 
 .terminal-wrapper {
     padding: 1em;
-    min-height: 200px;
+    height: 100%;
     max-height: calc(100vh - 80px);
-    height: auto;
     display: flex;
     flex-direction: column;
 }
 
+.terminal-mount {
+    height: 100%;
+}
+
+.m-slot {
+    height: 40%;
+    width: 100%;
+    margin-top: 1em;
+}
+
 .terminal-window {
+    height: 60%;
+    width: 100%;
     flex: 1;
     display: flex;
     flex-direction: column;

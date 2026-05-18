@@ -1,6 +1,7 @@
 // ----- admin-term/mod.ts -----
 
 import { STYLE } from "./assets";
+import { initMetrics, destroyMetrics } from "./metric";
 
 let _termOut:   HTMLElement | null = null;
 let _termInput: HTMLInputElement | null = null;
@@ -26,6 +27,7 @@ let _state: {
 
     if (!mount.querySelector('.terminal-window')) {
         mount.innerHTML = `
+        <div id="metrics" class="m-slot"></div>
         <div class="terminal-window">
         <div class="terminal-output" id="term-out"></div>
         <div class="terminal-input-row">
@@ -65,9 +67,13 @@ let _state: {
                 _termInput!.value = histIdx >= 0 ? _state.history[histIdx] : '';
             }
         });
+
+        initMetrics(ws);
+
     } else {
         _termOut   = document.getElementById('term-out') as HTMLElement;
         _termInput = document.getElementById('term-in') as HTMLInputElement;
+        initMetrics(ws);
     }
 
     _termInput?.focus();
@@ -109,9 +115,9 @@ let _state: {
 
 function _appendLineDOM(container: HTMLElement, text: string, color: string, marginLeft: string) {
     const div = document.createElement('div');
-    div.className    = 'terminal-line';
+    div.className     = 'terminal-line';
     div.style.cssText = `color: ${color}; margin-left: ${marginLeft};`;
-    div.textContent  = text;
+    div.textContent   = text;
     container.appendChild(div);
 }
 

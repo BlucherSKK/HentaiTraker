@@ -34,7 +34,7 @@ export class TerminalPage extends HTMLElement {
     private _renderShell() {
         this.innerHTML = `
         <div class="terminal-wrapper">
-        <div id="terminal-mount"></div>
+        <div id="terminal-mount" class="terminal-mount"></div>
         <div id="terminal-loader">
         <div class="loader"></div>
         <p>Загрузка терминала…</p>
