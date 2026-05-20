@@ -140,7 +140,7 @@ export class SettingsPage extends HTMLElement {
         const cur = getSettings();
 
         this.innerHTML = `
-        <div class="settings-wrap">
+        <div class="c-foreign">
         <div class="settings-title">Настройки</div>
         <div class="settings-section">
         <div class="settings-section-title">Уведомления</div>

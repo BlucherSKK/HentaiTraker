@@ -664,3 +664,37 @@ pub async fn settings_update(session: Arc<Mutex<Session>>, data: Value) {
     }
 }
 
+// ----- metrics_get -----
+
+pub async fn metrics_get(
+    session:   Arc<Mutex<Session>>,
+    _data:     Value,
+    srv_state: metric::ServerState,
+) {
+    let perm = {
+        let s = session.lock().await;
+        s.permissions.clone()
+    };
+
+    if !perm.contains(&(Permission::Terminal as i32)) {
+        let s = session.lock().await;
+        s.send_encrypted(&json!({ "event": "error", "code": "forbidden" })).await;
+        return;
+    }
+
+    let snap = srv_state.snapshot().await;
+
+    let s = session.lock().await;
+    s.send_encrypted(&json!({
+        "event":             "metrics_snapshot",
+        "uptime_secs":       snap.uptime_secs,
+        "connections_now":   snap.connections_now,
+        "connections_peak":  snap.connections_peak,
+        "connections_total": snap.connections_total,
+        "users_online":      snap.users_online,
+        "messages_total":    snap.messages_total,
+        "uploads_total":     snap.uploads_total,
+    })).await;
+}
+
+

@@ -14,10 +14,37 @@ use tokio::sync::RwLock;
 use crate::secure;
 
 const TOKEN_TTL_SECS: u64  = 300;
-pub const UPLOADS_DIR: &str = "./uploads";
+pub const STORE_DIR: &str = "./uploads";
 
 const LIMIT_IMAGE: u64 = 20  * 1024 * 1024;
 const LIMIT_LARGE: u64 = 200 * 1024 * 1024;
+
+use std::ffi::CString;
+use std::io;
+
+/// Возвращает доступный объём (в байтах) для указанной директории
+pub fn get_available_space<P: AsRef<Path>>(path: P) -> io::Result<u64> {
+    let path_str = path
+    .as_ref()
+    .to_str()
+    .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid path"))?;
+
+    let c_path = CString::new(path_str)
+    .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+
+    let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
+
+    let ret = unsafe { libc::statvfs(c_path.as_ptr(), &mut stat) };
+
+    if ret != 0 {
+        return Err(io::Error::last_os_error());
+    }
+
+    // f_bavail — блоки, доступные непривилегированному пользователю
+    // f_frsize — размер блока файловой системы
+    Ok(stat.f_bavail * stat.f_frsize)
+}
+
 
 // ----- upload token store -----
 
@@ -106,7 +133,7 @@ pub async fn upload(
     }
 
     let filename = format!("{}.{}", secure::get_token(16), ext);
-    let dest     = Path::new(UPLOADS_DIR).join(&filename);
+    let dest     = Path::new(STORE_DIR).join(&filename);
 
     let tmp_path = match form.file.path() {
         Some(p) => p.to_path_buf(),
@@ -133,7 +160,7 @@ pub async fn delete_file(name: &str) -> Status {
         return Status::BadRequest;
     }
 
-    let path: PathBuf = [UPLOADS_DIR, name].iter().collect();
+    let path: PathBuf = [STORE_DIR, name].iter().collect();
     match tokio::fs::remove_file(&path).await {
         Ok(_)  => Status::Ok,
         Err(_) => Status::NotFound,
@@ -151,6 +178,6 @@ pub async fn serve_file(n: &str) -> Option<NamedFile> {
         return None;
     }
 
-    let path: PathBuf = [UPLOADS_DIR, n].iter().collect();
+    let path: PathBuf = [STORE_DIR, n].iter().collect();
     NamedFile::open(path).await.ok()
 }

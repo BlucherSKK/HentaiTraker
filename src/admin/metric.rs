@@ -2,6 +2,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
+use lazy_static::lazy_static;
 
 /// Глобальные метрики сервера.
 /// Arc<RwLock<...>> внутри — дешёвый Clone, подходит как Rocket managed state.
@@ -10,6 +11,17 @@ pub struct ServerState {
     inner: Arc<RwLock<Metrics>>,
     started_at: Instant,
     pub sidebar_post_id: Arc<RwLock<Option<i32>>>,
+}
+
+lazy_static! {
+    static ref AvaibleSize: u64 = crate::lfs::get_available_space();
+}
+
+pub enum FileStoreState {
+    PASSED,
+    YellowAlert,
+    RedAlert,
+    Lock
 }
 
 struct Metrics {
@@ -25,6 +37,10 @@ struct Metrics {
     pub messages_total: u64,
     /// Всего загрузок файлов за время работы.
     pub uploads_total: u64,
+    pub media_weight: u64,
+    pub media_count:  u64,
+    /// Стадия заполнености хранилиша
+    pub lfs_state: FileStoreState,
 }
 
 impl Metrics {
@@ -36,8 +52,12 @@ impl Metrics {
             users_online:      0,
             messages_total:    0,
             uploads_total:     0,
+            media_weight: 0,
+            media_count: 0,
+            lfs_state: FileStoreState::PASSED,
         }
     }
+
 }
 
 impl ServerState {
@@ -45,7 +65,7 @@ impl ServerState {
         Self {
             inner:      Arc::new(RwLock::new(Metrics::new())),
             started_at: Instant::now(),
-             sidebar_post_id: Arc::new(RwLock::new(None)),
+            sidebar_post_id: Arc::new(RwLock::new(None)),
         }
     }
 

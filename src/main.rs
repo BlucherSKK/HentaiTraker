@@ -25,7 +25,7 @@ mod gc;
 
 mod admin;
 
-mod lfs;
+pub mod lfs;
 use lfs::UploadTokenStore;
 
 use db::Store;

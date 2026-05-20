@@ -12,7 +12,9 @@ deadpool-redis = { version = "0.23.0", features = ["rt_tokio_1"] }
 dotenvy = "0.15.7"
 env_logger = "0.11.10"
 hex = "0.4.3"
+lazy_static = "1.5.0"
 lettre = { version = "0.11.21", features = ["tokio1", "tokio1-native-tls", "builder"] }
+libc = "0.2.186"
 password-hash = "0.6.1"
 rand = "0.10.1"
 rocket = { version = "0.5.1", features = ["json"] }

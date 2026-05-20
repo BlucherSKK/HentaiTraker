@@ -175,6 +175,13 @@ pub async fn ws(
         router.on("chat_list", |sess, data| async move {
             handlers::chat_list(sess, data).await
         });
+        {
+            let ss = srv_state.clone();
+            router.on("metrics_get", move |sess, data| {
+                let ss = ss.clone();
+                async move { handlers::metrics_get(sess, data, ss).await }
+            });
+        }
         router.on("user_posts", |sess, data| async move {
             handlers::user_posts(sess, data).await
         });
